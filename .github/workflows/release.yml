@@ -1,14 +1,16 @@
 name: Release
 
-# Push a tag like v0.2.0 to build binaries for every platform and publish
-# them (plus checksums.txt, which the installers verify) as a GitHub Release.
+# Push a tag like v0.2.0 (or run this workflow by hand with a tag name) to
+# build binaries for every platform and publish them, plus checksums.txt
+# which the installers verify, as a GitHub Release. Run by hand, a tag that
+# doesn't exist yet is created at the commit the workflow runs on.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to (re)build, e.g. v0.1.0
+        description: Tag to release, e.g. v0.1.0 (created from the chosen branch if new)
         required: true
 
 permissions:
@@ -21,8 +23,6 @@ jobs:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -51,5 +51,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" dist/* --title "ccbs $TAG" --generate-notes
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "ccbs $TAG" --generate-notes
           fi
