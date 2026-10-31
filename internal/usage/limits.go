@@ -88,7 +88,7 @@ func FetchLimits(ctx context.Context) (*Limits, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, usageURL, nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("anthropic-beta", "oauth-2025-04-20")
-	req.Header.Set("User-Agent", "ccbm")
+	req.Header.Set("User-Agent", "ccbs")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

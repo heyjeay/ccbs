@@ -3,9 +3,11 @@ package ui
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -33,6 +35,8 @@ type Options struct {
 	Demo     *usage.Limits
 	Interval time.Duration
 	Theme    Theme
+	// OnTheme is called after the user switches theme (to persist it).
+	OnTheme func(Theme)
 }
 
 type liveResult struct {
@@ -50,6 +54,7 @@ func Run(opt Options) error {
 	if opt.Interval == 0 {
 		opt.Interval = 2 * time.Second
 	}
+	enableVT()
 	old, err := term.MakeRaw(in)
 	if err != nil {
 		return err
@@ -97,6 +102,13 @@ func Run(opt Options) error {
 		// synchronized update avoids tearing on terminals that support it
 		frame := "\x1b[?2026h\x1b[H" + Render(st, w, h, opt.Theme) + "\x1b[?2026l"
 		io.WriteString(out, frame)
+	}
+	themes := AllThemes()
+	themeIdx := 0
+	for i, t := range themes {
+		if strings.EqualFold(t.Name, opt.Theme.Name) {
+			themeIdx = i
+		}
 	}
 	draw()
 
@@ -174,6 +186,19 @@ func Run(opt Options) error {
 				opt.Interval = min(max(opt.Interval+d, 500*time.Millisecond), 10*time.Second)
 				st.Interval = opt.Interval
 				tick.Reset(opt.Interval)
+			case "t", "T":
+				if k == "t" {
+					themeIdx = (themeIdx + 1) % len(themes)
+				} else {
+					themeIdx = (themeIdx - 1 + len(themes)) % len(themes)
+				}
+				opt.Theme = themes[themeIdx]
+				st.Toast = fmt.Sprintf("theme %d/%d: %s", themeIdx+1, len(themes), opt.Theme.Name)
+				st.ToastTill = time.Now().Add(3 * time.Second)
+				if opt.OnTheme != nil {
+					opt.OnTheme(opt.Theme)
+				}
+				io.WriteString(out, "\x1b[0m\x1b[2J")
 			case "r":
 				if !loading {
 					loading = true

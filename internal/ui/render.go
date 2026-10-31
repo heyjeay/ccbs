@@ -36,6 +36,8 @@ type State struct {
 	Frame     int
 	Interval  time.Duration
 	ActiveFor time.Duration // a session counts as "now" if touched within this
+	Toast     string        // brief message shown in the top border
+	ToastTill time.Time
 }
 
 // derived per-frame data
@@ -50,12 +52,15 @@ type frame struct {
 	active  []*usage.Session
 }
 
-func Render(st *State, w, h int, th Theme) string {
+func Render(st *State, w, h int, th Theme) string { return RenderCanvas(st, w, h, th).String() }
+
+// RenderCanvas draws a frame without encoding it (used for HTML export).
+func RenderCanvas(st *State, w, h int, th Theme) *Canvas {
 	c := NewCanvas(w, h, th.MainBG)
 	if w < 40 || h < 16 {
-		c.Text(1, 1, "ccbm: terminal too small", Style{FG: th.HiFG}, 0)
+		c.Text(1, 1, "ccbs: terminal too small", Style{FG: th.HiFG}, 0)
 		c.Text(1, 2, fmt.Sprintf("need 40x16, have %dx%d", w, h), Style{FG: th.MainFG}, 0)
-		return c.String()
+		return c
 	}
 	f := &frame{State: st, th: th}
 	f.five, f.fiveOn = usage.FiveHourWindow(st.Snap, st.Now, st.Live)
@@ -113,7 +118,7 @@ func Render(st *State, w, h int, th Theme) string {
 		}
 		f.drawHistory(c, Rect{0, y, w, h - y}, w >= 70)
 	}
-	return c.String()
+	return c
 }
 
 func sortedSessions(in []*usage.Session, mode SortMode, now time.Time) []*usage.Session {
@@ -139,11 +144,11 @@ func (f *frame) sourceTag() []Tag {
 	th := f.th
 	switch {
 	case f.Demo:
-		return []Tag{{Text: "● ", FG: th.WeekEnd}, {Text: "demo"}}
+		return []Tag{{Text: "● ", FG: th.Temp.At(1)}, {Text: "demo"}}
 	case f.Live != nil:
-		return []Tag{{Text: "● ", FG: th.Ok}, {Text: "live"}}
+		return []Tag{{Text: "● ", FG: th.Ok()}, {Text: "live"}}
 	}
-	return []Tag{{Text: "● ", FG: th.Warn}, {Text: "local est."}}
+	return []Tag{{Text: "● ", FG: th.Warn()}, {Text: "local est."}}
 }
 
 func (f *frame) drawFive(c *Canvas, r Rect, wide bool) {
@@ -151,7 +156,11 @@ func (f *frame) drawFive(c *Canvas, r Rect, wide bool) {
 	col := th.BoxFive
 	c.Box(r, 1, "5h window", col, th)
 	if r.W >= 60 {
-		c.CenterTag(r, r.Y, col, th, Tag{Text: "ccbm ", Hi: true}, Tag{Text: f.Now.Format("15:04:05")})
+		if f.Toast != "" && f.Now.Before(f.ToastTill) {
+			c.CenterTag(r, r.Y, col, th, Tag{Text: f.Toast, Hi: true})
+		} else {
+			c.CenterTag(r, r.Y, col, th, Tag{Text: "ccbs ", Hi: true}, Tag{Text: f.Now.Format("15:04:05")})
+		}
 	}
 	c.BorderTag(r.X+r.W-2, r.Y, col, th, f.sourceTag()...)
 	in := r.Inner()
@@ -320,10 +329,10 @@ func (f *frame) drawFiveStats(c *Canvas, r Rect, boxed bool) {
 		case util < 0:
 			c.Text(x+7, y, "no limit data", lbl, 0)
 		case hits:
-			c.Text(x+7, y, "⚠ limit ~"+at.In(f.Now.Location()).Format("15:04"), Style{FG: th.Bad, Bold: true}, 0)
-			c.TextRight(right, y, "in "+fmtDur(at.Sub(f.Now)), Style{FG: th.Bad})
+			c.Text(x+7, y, "⚠ limit ~"+at.In(f.Now.Location()).Format("15:04"), Style{FG: th.Bad(), Bold: true}, 0)
+			c.TextRight(right, y, "in "+fmtDur(at.Sub(f.Now)), Style{FG: th.Bad()})
 		default:
-			c.Text(x+7, y, "✓ safe until reset", Style{FG: th.Ok}, 0)
+			c.Text(x+7, y, "✓ safe until reset", Style{FG: th.Ok()}, 0)
 		}
 	})
 	if boxed && f.LiveErr != "" && f.Live == nil && !f.Demo {
@@ -394,7 +403,7 @@ func (f *frame) drawWeek(c *Canvas, r Rect) {
 	x, right := in.X+1, in.X+in.W-1
 	y := in.Y
 	lbl := Style{FG: th.GraphText}
-	grad := func(v float64) Color { return Gradient3(th.WeekStart, th.WeekMid, th.WeekEnd, v) }
+	grad := func(v float64) Color { return th.Temp.At(v) }
 	w := f.week
 	bottom := in.Y + in.H
 
@@ -495,20 +504,20 @@ func (f *frame) drawNow(c *Canvas, r Rect) {
 			break
 		}
 		idle := f.Now.Sub(s.End)
-		dot, dc := spinner[f.Frame%len(spinner)], th.Ok
+		dot, dc := spinner[f.Frame%len(spinner)], th.Ok()
 		if idle > 2*time.Minute {
-			dot, dc = '●', th.Warn
+			dot, dc = '●', th.Warn()
 		}
 		c.Set(x, y, dot, Style{FG: dc, Bold: true})
 		cx := x + 2
 		cx += c.Text(cx, y, s.ProjectName(), Style{FG: th.Title, Bold: true}, 0) + 1
 		if s.Branch != "" {
-			cx += c.Text(cx, y, "⎇ "+Truncate(s.Branch, 18), Style{FG: th.WeekMid}, 0) + 1
+			cx += c.Text(cx, y, "⎇ "+Truncate(s.Branch, 18), Style{FG: th.Temp.At(0.5)}, 0) + 1
 		}
 		ago := fmtAgo(f.Now, s.End)
 		mdl := usage.ShortModel(s.MainModel())
 		if cx+Width(mdl)+Width(ago)+3 < right {
-			c.Text(cx, y, mdl, Style{FG: th.GradStart}, 0)
+			c.Text(cx, y, mdl, Style{FG: th.Temp.At(0)}, 0)
 		}
 		c.TextRight(right, y, ago, Style{FG: th.GraphText})
 		y++
@@ -665,10 +674,10 @@ func (f *frame) drawHistory(c *Canvas, r Rect, wide bool) {
 			tc{s.DisplayTitle(), base},
 		)
 		if showModel {
-			cells = append(cells, tc{usage.ShortModel(s.MainModel()), dim(base, th.GradStart, sel)})
+			cells = append(cells, tc{usage.ShortModel(s.MainModel()), dim(base, th.Temp.At(0), sel)})
 		}
 		share := float64(s.Tokens.Total()) / maxTok
-		cells = append(cells, tc{fmtTok(float64(s.Tokens.Total())), base.Fg(pick(sel, th.SelectedFG, th.Heat(share)))})
+		cells = append(cells, tc{fmtTok(float64(s.Tokens.Total())), base.Fg(pick(sel, th.SelectedFG, th.Proc.At(share)))})
 		if wide {
 			cells = append(cells, tc{fmtCost(s.Cost), dim(base, th.ProcMisc, sel)})
 		}
@@ -683,7 +692,7 @@ func (f *frame) drawHistory(c *Canvas, r Rect, wide bool) {
 				for j := 0; j < cl.w; j++ {
 					st := Style{FG: th.MeterBG, BG: base.BG}
 					if j < max(n, 1) {
-						st.FG = th.Heat(float64(j) / float64(cl.w))
+						st.FG = th.Proc.At(float64(j) / float64(cl.w))
 					}
 					c.Set(x+j, y, '▮', st)
 				}
@@ -721,7 +730,7 @@ func (f *frame) drawDetail(c *Canvas, r Rect, s *usage.Session) {
 	if s.Branch != "" {
 		where = "⎇ " + s.Branch + "  " + where
 	}
-	c.Text(x, y, Truncate(where, w), Style{FG: th.WeekMid}, 0)
+	c.Text(x, y, Truncate(where, w), Style{FG: th.Temp.At(0.5)}, 0)
 	c.TextRight(x+w, y, fmtWhen(f.Now, s.Start)+" → "+fmtWhen(f.Now, s.End), lbl)
 	y++
 	if s.LastPrompt != "" {

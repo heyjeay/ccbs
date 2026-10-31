@@ -1,4 +1,4 @@
-// Package ui renders the ccbm dashboard onto a cell grid, btop style.
+// Package ui renders the ccbs dashboard onto a cell grid, btop style.
 package ui
 
 import (
@@ -193,3 +193,76 @@ func Truncate(s string, w int) string {
 }
 
 func Width(s string) int { return runewidth.StringWidth(s) }
+
+// HTML renders the canvas as one <div> per row. ASCII runs share a <span>;
+// every other glyph gets its own fixed-width <i> so box drawing and braille
+// stay on the grid whatever font the browser falls back to.
+func (c *Canvas) HTML() string {
+	var b strings.Builder
+	css := func(s Style) string {
+		var p []string
+		if s.FG.Set {
+			p = append(p, fmt.Sprintf("color:#%02x%02x%02x", s.FG.R, s.FG.G, s.FG.B))
+		}
+		if s.BG.Set && s.BG != c.bg {
+			p = append(p, fmt.Sprintf("background:#%02x%02x%02x", s.BG.R, s.BG.G, s.BG.B))
+		}
+		if s.Bold {
+			p = append(p, "font-weight:700")
+		}
+		return strings.Join(p, ";")
+	}
+	esc := func(r rune) string {
+		switch r {
+		case '<':
+			return "&lt;"
+		case '>':
+			return "&gt;"
+		case '&':
+			return "&amp;"
+		}
+		return string(r)
+	}
+	for y := 0; y < c.H; y++ {
+		b.WriteString("<div>")
+		x := 0
+		for x < c.W {
+			ce := c.cells[y*c.W+x]
+			if ce.cont {
+				x++
+				continue
+			}
+			st := css(ce.st)
+			if ce.r < 0x80 {
+				// gather an ASCII run with identical style
+				var run strings.Builder
+				for x < c.W {
+					n := c.cells[y*c.W+x]
+					if n.cont || n.r >= 0x80 || n.st != ce.st {
+						break
+					}
+					run.WriteString(esc(n.r))
+					x++
+				}
+				if st == "" {
+					b.WriteString("<span>" + run.String() + "</span>")
+				} else {
+					b.WriteString(`<span style="` + st + `">` + run.String() + "</span>")
+				}
+				continue
+			}
+			cls := "g"
+			if runewidth.RuneWidth(ce.r) == 2 {
+				cls = "g w"
+			}
+			if st == "" {
+				fmt.Fprintf(&b, `<i class="%s">%s</i>`, cls, esc(ce.r))
+			} else {
+				fmt.Fprintf(&b, `<i class="%s" style="%s">%s</i>`, cls, st, esc(ce.r))
+			}
+			x++
+		}
+		b.WriteString("</div>")
+	}
+	return b.String()
+}

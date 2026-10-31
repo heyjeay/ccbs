@@ -33,7 +33,7 @@ type Entry struct {
 	Cost      float64
 }
 
-// Session is everything ccbm knows about one Claude Code conversation.
+// Session is everything ccbs knows about one Claude Code conversation.
 type Session struct {
 	ID         string
 	Project    string // working directory

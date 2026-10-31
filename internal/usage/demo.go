@@ -13,7 +13,7 @@ type demoTask struct {
 }
 
 var demoTasks = []demoTask{
-	{"ccbm", "main", "btop-style usage dashboard", "claude-opus-5-5",
+	{"ccbs", "main", "btop-style usage dashboard", "claude-opus-5-5",
 		[]string{"build a btop-like TUI for claude code usage", "add braille graph for the 5h window", "make the history table sortable"},
 		[]string{"Edit internal/ui/render.go", "Bash go build ./...", "Read internal/usage/store.go", "Write internal/ui/graph.go"}},
 	{"api-gateway", "feat/rate-limit", "Token-bucket rate limiter for gateway", "claude-opus-5-5",
@@ -37,7 +37,7 @@ var demoTasks = []demoTask{
 }
 
 // Demo builds a believable week of activity ending at now, plus matching
-// live limits, so ccbm can be explored without any local history.
+// live limits, so ccbs can be explored without any local history.
 func Demo(now time.Time) (Snapshot, *Limits) {
 	rng := rand.New(rand.NewSource(42))
 	var entries []Entry
