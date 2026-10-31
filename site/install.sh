@@ -7,7 +7,7 @@
 # ~/.local/bin (override with CCBS_INSTALL_DIR). No sudo needed.
 set -eu
 
-REPO="${CCBS_REPO:-heyjeay/ccbm}"
+REPO="${CCBS_REPO:-heyjeay/ccbs}"
 DIR="${CCBS_INSTALL_DIR:-$HOME/.local/bin}"
 VERSION="${CCBS_VERSION:-latest}"
 

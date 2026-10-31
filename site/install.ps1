@@ -6,7 +6,7 @@
 # folder to your user PATH. No admin rights needed.
 $ErrorActionPreference = 'Stop'
 
-$repo = if ($env:CCBS_REPO) { $env:CCBS_REPO } else { 'heyjeay/ccbm' }
+$repo = if ($env:CCBS_REPO) { $env:CCBS_REPO } else { 'heyjeay/ccbs' }
 $dir  = if ($env:CCBS_INSTALL_DIR) { $env:CCBS_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'ccbs' }
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
 $file = "ccbs_windows_$arch.zip"

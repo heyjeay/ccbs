@@ -35,7 +35,7 @@ jobs:
             out=build/${os}_${arch}; mkdir -p "$out"
             bin=ccbs; [ "$os" = windows ] && bin=ccbs.exe
             CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
-              -ldflags "-s -w -X main.version=${TAG#v}" -o "$out/$bin" ./cmd/ccbs
+              -ldflags "-s -w -X main.version=${TAG#v}" -o "$out/$bin" .
             cp README.md LICENSE "$out/"
             if [ "$os" = windows ]; then
               (cd "$out" && zip -q "../../dist/ccbs_${os}_${arch}.zip" *)

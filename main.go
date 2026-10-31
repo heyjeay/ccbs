@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/heyjeay/ccbm/internal/ui"
-	"github.com/heyjeay/ccbm/internal/usage"
+	"github.com/heyjeay/ccbs/internal/ui"
+	"github.com/heyjeay/ccbs/internal/usage"
 )
 
 var version = "dev"

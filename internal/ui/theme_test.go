@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/heyjeay/ccbm/internal/usage"
+	"github.com/heyjeay/ccbs/internal/usage"
 )
 
 func TestAllBundledThemesParse(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/heyjeay/ccbm/internal/usage"
+	"github.com/heyjeay/ccbs/internal/usage"
 )
 
 // Source supplies data to the app.

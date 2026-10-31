@@ -8,7 +8,7 @@ import (
 
 	"github.com/mattn/go-runewidth"
 
-	"github.com/heyjeay/ccbm/internal/usage"
+	"github.com/heyjeay/ccbs/internal/usage"
 )
 
 var ansi = regexp.MustCompile(`\x1b\[[0-9;]*m`)

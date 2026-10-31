@@ -2,7 +2,7 @@
 
 **Claude Code better status.** A [btop](https://github.com/aristocratos/btop)-style terminal dashboard for your Claude Code usage. It shows how much of your 5-hour and weekly limits you've used, how long until they reset, what you're working on right now, and what every past session cost in tokens.
 
-**Website:** https://heyjeay.github.io/ccbm/ (moves to `/ccbs/` once the repo is renamed)
+**Website:** https://heyjeay.github.io/ccbs/ (moves to `/ccbs/` once the repo is renamed)
 
 ![ccbs wide layout](docs/screenshot-wide.png)
 
@@ -13,22 +13,22 @@
 **macOS / Linux**
 
 ```sh
-curl -fsSL https://heyjeay.github.io/ccbm/install.sh | sh
+curl -fsSL https://heyjeay.github.io/ccbs/install.sh | sh
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-irm https://heyjeay.github.io/ccbm/install.ps1 | iex
+irm https://heyjeay.github.io/ccbs/install.ps1 | iex
 ```
 
 **With Go**
 
 ```sh
-go install github.com/heyjeay/ccbm/cmd/ccbs@latest
+go install github.com/heyjeay/ccbs@latest
 ```
 
-The installers download the latest [release](https://github.com/heyjeay/ccbm/releases) for your OS and CPU, verify its SHA-256 checksum, and put `ccbs` in `~/.local/bin` (or `%LOCALAPPDATA%\ccbs` on Windows). No sudo or admin rights are needed.
+The installers download the latest [release](https://github.com/heyjeay/ccbs/releases) for your OS and CPU, verify its SHA-256 checksum, and put `ccbs` in `~/.local/bin` (or `%LOCALAPPDATA%\ccbs` on Windows). No sudo or admin rights are needed.
 
 ## Panels
 
@@ -85,11 +85,11 @@ ccbs --snapshot --width 120 --height 40   # print one frame and exit
 
 ```sh
 go test ./...
-go run ./cmd/ccbs --demo
+go run . --demo
 go run ./cmd/sitegen -out _site    # build the website into _site/
 ```
 
-- `cmd/ccbs`: the CLI.
+- `main.go`: the CLI.
 - `internal/usage`: transcript parsing, windows, pricing, and live limits.
 - `internal/ui`: the renderer, a cell canvas that emits truecolor escapes the way btop does (and HTML for the website).
 - `internal/ui/themes`: btop's theme files.

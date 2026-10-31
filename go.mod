@@ -1,4 +1,4 @@
-module github.com/heyjeay/ccbm
+module github.com/heyjeay/ccbs
 
 go 1.24.7
 
