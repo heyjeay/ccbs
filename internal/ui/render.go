@@ -26,28 +26,28 @@ func (s SortMode) String() string {
 
 // State is everything a frame needs.
 type State struct {
-	Now      time.Time
-	Snap     usage.Snapshot
-	Live     *usage.Limits
-	LiveErr  string
-	Demo     bool
-	Sel      int
-	Sort     SortMode
-	Frame    int
-	Interval time.Duration
+	Now       time.Time
+	Snap      usage.Snapshot
+	Live      *usage.Limits
+	LiveErr   string
+	Demo      bool
+	Sel       int
+	Sort      SortMode
+	Frame     int
+	Interval  time.Duration
 	ActiveFor time.Duration // a session counts as "now" if touched within this
 }
 
 // derived per-frame data
 type frame struct {
 	*State
-	th       Theme
-	five     usage.Window
-	fiveOn   bool
-	week     usage.Window
-	burn     usage.Burn
-	history  []*usage.Session
-	active   []*usage.Session
+	th      Theme
+	five    usage.Window
+	fiveOn  bool
+	week    usage.Window
+	burn    usage.Burn
+	history []*usage.Session
+	active  []*usage.Session
 }
 
 func Render(st *State, w, h int, th Theme) string {
@@ -774,7 +774,6 @@ func pick(b bool, x, y Color) Color {
 	}
 	return y
 }
-
 
 func clampI(v, lo, hi int) int {
 	if v < lo {

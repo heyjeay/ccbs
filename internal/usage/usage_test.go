@@ -119,8 +119,8 @@ func TestBlocks(t *testing.T) {
 	e := func(s string) Entry { return Entry{Time: at(s), Tokens: Tokens{Out: 1}} }
 	bs := Blocks([]Entry{
 		e("2026-10-31T09:20:00Z"), e("2026-10-31T13:59:00Z"), // same block (09:00-14:00)
-		e("2026-10-31T14:01:00Z"),                           // past end → new block at 14:00
-		e("2026-10-31T23:30:00Z"),                           // after a long gap
+		e("2026-10-31T14:01:00Z"), // past end → new block at 14:00
+		e("2026-10-31T23:30:00Z"), // after a long gap
 	})
 	if len(bs) != 3 {
 		t.Fatalf("want 3 blocks, got %d", len(bs))
