@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +39,45 @@ func luminance(c ui.Color) float64 {
 	return 0.2126*float64(c.R) + 0.7152*float64(c.G) + 0.0722*float64(c.B)
 }
 
+// relLum is WCAG relative luminance.
+func relLum(c ui.Color) float64 {
+	f := func(v uint8) float64 {
+		x := float64(v) / 255
+		if x <= 0.03928 {
+			return x / 12.92
+		}
+		return math.Pow((x+0.055)/1.055, 2.4)
+	}
+	return 0.2126*f(c.R) + 0.7152*f(c.G) + 0.0722*f(c.B)
+}
+
+func contrast(a, b ui.Color) float64 {
+	la, lb := relLum(a), relLum(b)
+	if la < lb {
+		la, lb = lb, la
+	}
+	return (la + 0.05) / (lb + 0.05)
+}
+
+// legible keeps a theme's own color when it already stands out from the
+// background enough, and otherwise moves it toward black or white (whichever
+// is further from the background) just far enough to reach the target.
+func legible(c, bg ui.Color, target float64) ui.Color {
+	if contrast(c, bg) >= target {
+		return c
+	}
+	pole := ui.Color{R: 255, G: 255, B: 255, Set: true}
+	if relLum(bg) > 0.4 {
+		pole = ui.Color{Set: true}
+	}
+	for t := 0.05; t <= 1; t += 0.05 {
+		if m := ui.Lerp(c, pole, t); contrast(m, bg) >= target {
+			return m
+		}
+	}
+	return pole
+}
+
 // vars turns a theme into CSS custom properties so the whole page can
 // take on the theme, not just the preview.
 func vars(t ui.Theme) map[string]string {
@@ -45,6 +85,14 @@ func vars(t ui.Theme) map[string]string {
 	light := t.MainBG.Set && luminance(t.MainBG) > 140
 	if !t.MainBG.Set && luminance(t.MainFG) < 110 {
 		bg, light = "#f4f4f4", true // theme meant for light terminals
+	}
+	bgc := t.MainBG
+	if !bgc.Set {
+		bgc = ui.Hex(bg)
+	}
+	text2 := t.GraphText
+	if !text2.Set {
+		text2 = t.InactiveFG
 	}
 	scheme := "dark"
 	if light {
@@ -55,7 +103,10 @@ func vars(t ui.Theme) map[string]string {
 		"--hi": hex(t.HiFG, "#b54040"), "--sel-bg": hex(t.SelectedBG, "#6a2f2f"), "--sel-fg": hex(t.SelectedFG, "#eeeeee"),
 		"--dim": hex(t.InactiveFG, "#404040"), "--text2": hex(t.GraphText, "#606060"), "--div": hex(t.DivLine, "#303030"),
 		"--misc": hex(t.ProcMisc, "#0de756"),
-		"--box1": hex(t.BoxFive, "#556d59"), "--box2": hex(t.BoxWeek, "#6c6c4b"), "--box3": hex(t.BoxNow, "#5c588d"), "--box4": hex(t.BoxHist, "#805252"),
+		// guaranteed-readable versions for small text and control borders
+		"--muted": hex(legible(text2, bgc, 4.5), "#909090"),
+		"--edge":  hex(legible(t.DivLine, bgc, 2), "#4a4a4a"),
+		"--box1":  hex(t.BoxFive, "#556d59"), "--box2": hex(t.BoxWeek, "#6c6c4b"), "--box3": hex(t.BoxNow, "#5c588d"), "--box4": hex(t.BoxHist, "#805252"),
 		"--g1": hex(t.CPU.At(0), "#77ca9b"), "--g2": hex(t.CPU.At(0.5), "#cbc06c"), "--g3": hex(t.CPU.At(1), "#dc4c4c"),
 		"--t1": hex(t.Temp.At(0), "#4897d4"), "--t2": hex(t.Temp.At(0.5), "#5474e8"), "--t3": hex(t.Temp.At(1), "#ff40b6"),
 		"color-scheme": scheme,
