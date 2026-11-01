@@ -29,6 +29,13 @@ func (s StoreSource) Refresh() usage.Snapshot {
 	return s.Store.Snapshot()
 }
 
+func (s StoreSource) Progress() (done, total int64) { return s.Store.Progress() }
+
+// progresser is implemented by sources that can report loading progress.
+type progresser interface {
+	Progress() (done, total int64)
+}
+
 type Options struct {
 	Source   Source
 	Live     bool // poll Anthropic for real 5h/weekly utilization
@@ -94,7 +101,9 @@ func Run(opt Options) error {
 		}()
 	}
 
-	st.Snap = opt.Source.Refresh()
+	// Draw straight away and read history in the background: a big
+	// ~/.claude/projects can take a moment, and a blank screen looks hung.
+	st.Loading = true
 	fetch()
 
 	w, h, _ := term.GetSize(int(out.Fd()))
@@ -110,18 +119,30 @@ func Run(opt Options) error {
 			themeIdx = i
 		}
 	}
+	loading := true
+	load()
 	draw()
 
 	tick := time.NewTicker(opt.Interval)
 	defer tick.Stop()
 	resize := time.NewTicker(200 * time.Millisecond)
 	defer resize.Stop()
-	loading := false
+	progress := time.NewTicker(100 * time.Millisecond)
+	defer progress.Stop()
 
 	for {
 		select {
 		case <-sig:
 			return nil
+		case <-progress.C:
+			if st.Loading {
+				if p, ok := opt.Source.(progresser); ok {
+					st.LoadDone, st.LoadTotal = p.Progress()
+				}
+				st.Now = time.Now()
+				st.Frame++
+				draw()
+			}
 		case <-resize.C:
 			if nw, nh, err := term.GetSize(int(out.Fd())); err == nil && (nw != w || nh != h) {
 				w, h = nw, nh
@@ -142,7 +163,7 @@ func Run(opt Options) error {
 			}
 			draw()
 		case snap := <-data:
-			loading = false
+			loading, st.Loading = false, false
 			st.Snap = snap
 			draw()
 		case r := <-live:

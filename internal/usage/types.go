@@ -49,6 +49,10 @@ type Session struct {
 	Calls      int
 	Prompts    int
 	Models     map[string]int64 // model -> total tokens
+
+	// bookkeeping so records can be merged in any order
+	firstAskAt, lastPromptAt, lastToolAt time.Time
+	titleRank                            int
 }
 
 // MainModel is the model that consumed the most tokens in the session.

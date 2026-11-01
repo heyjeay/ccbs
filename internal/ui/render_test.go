@@ -44,3 +44,18 @@ func TestRenderWithoutData(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderLoadingOverlay(t *testing.T) {
+	for _, sz := range [][2]int{{40, 16}, {56, 40}, {120, 40}} {
+		st := &State{Now: time.Now(), Loading: true, LoadDone: 300 << 20, LoadTotal: 1200 << 20}
+		out := ansi.ReplaceAllString(Render(st, sz[0], sz[1], BtopDefault), "")
+		if !strings.Contains(out, "loading") || !strings.Contains(out, "300 MB of 1.2 GB") {
+			t.Errorf("%dx%d: loading box missing", sz[0], sz[1])
+		}
+		for i, l := range strings.Split(out, "\n") {
+			if w := runewidth.StringWidth(l); w != sz[0] {
+				t.Fatalf("%dx%d line %d width %d", sz[0], sz[1], i, w)
+			}
+		}
+	}
+}

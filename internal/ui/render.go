@@ -38,6 +38,9 @@ type State struct {
 	ActiveFor time.Duration // a session counts as "now" if touched within this
 	Toast     string        // brief message shown in the top border
 	ToastTill time.Time
+	Loading   bool          // first read of the transcripts still running
+	LoadDone  int64         // bytes read so far
+	LoadTotal int64
 }
 
 // derived per-frame data
@@ -117,6 +120,9 @@ func RenderCanvas(st *State, w, h int, th Theme) *Canvas {
 			y += nowH
 		}
 		f.drawHistory(c, Rect{0, y, w, h - y}, w >= 70)
+	}
+	if st.Loading {
+		f.drawLoading(c)
 	}
 	return c
 }
@@ -224,7 +230,7 @@ func (f *frame) drawFiveGraph(c *Canvas, g Rect) {
 		perMin := peak / bucket.Minutes()
 		c.Text(g.X, g.Y, "▲ "+fmtTok(perMin)+"/min", Style{FG: th.GraphText}, 0)
 	}
-	if !f.fiveOn && f.Live == nil {
+	if !f.fiveOn && f.Live == nil && !f.Loading {
 		msg := "idle — next window opens with your next message"
 		c.Text(g.X+max(0, (g.W-Width(msg))/2), g.Y+g.H/2, Truncate(msg, g.W), Style{FG: th.GraphText}, 0)
 	}
@@ -393,6 +399,42 @@ func topProjects(snap usage.Snapshot, w usage.Window, n int) []projUse {
 	return out
 }
 
+// ───────────────────────────── loading ─────────────────────────────
+
+// drawLoading floats a progress box over the (still empty) dashboard while
+// the first read of ~/.claude/projects runs.
+func (f *frame) drawLoading(c *Canvas) {
+	th := f.th
+	w := min(58, c.W-4)
+	r := Rect{(c.W - w) / 2, max(1, c.H/2-3), w, 7}
+	c.Fill(r.X, r.Y, r.W, r.H, Style{BG: th.MainBG})
+	c.Box(r, -1, "loading", th.HiFG, th)
+	in := r.Inner()
+	x := in.X + 2
+	spin := string(spinner[f.Frame%len(spinner)])
+	c.Text(x, in.Y+1, spin, Style{FG: th.Ok(), Bold: true}, 0)
+	c.Text(x+2, in.Y+1, Truncate("reading your Claude Code history", in.W-6), Style{FG: th.Title, Bold: true}, 0)
+	done, total := f.LoadDone, f.LoadTotal
+	if total <= 0 {
+		c.Text(x, in.Y+3, "looking for transcripts…", Style{FG: th.GraphText}, 0)
+		return
+	}
+	v := float64(done) / float64(total)
+	c.Meter(x, in.Y+3, in.W-10, v, th, th.Heat)
+	c.TextRight(in.X+in.W-2, in.Y+3, fmt.Sprintf("%3.0f%%", 100*v), Style{FG: th.Title, Bold: true})
+	c.Text(x, in.Y+4, fmtBytes(done)+" of "+fmtBytes(total), Style{FG: th.GraphText}, 0)
+}
+
+func fmtBytes(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+	case n >= 1<<20:
+		return fmt.Sprintf("%.0f MB", float64(n)/(1<<20))
+	}
+	return fmt.Sprintf("%.0f KB", float64(n)/(1<<10))
+}
+
 // ───────────────────────────── weekly ─────────────────────────────
 
 func (f *frame) drawWeek(c *Canvas, r Rect) {
@@ -491,6 +533,9 @@ func (f *frame) drawNow(c *Canvas, r Rect) {
 	x, right := in.X+1, in.X+in.W-1
 	y := in.Y
 	if len(f.active) == 0 {
+		if f.Loading {
+			return
+		}
 		msg := "no active sessions"
 		if len(f.Snap.Sessions) > 0 {
 			s := f.Snap.Sessions[0]
