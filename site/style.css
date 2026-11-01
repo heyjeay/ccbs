@@ -191,7 +191,12 @@ footer .d { color: var(--g1); }
 footer .ok { color: var(--misc); }
 footer .made { margin: 14px 0 12px; color: var(--fg); }
 footer .made a { color: var(--title); font-weight: 700; }
-footer .heart { color: var(--hi); font-family: var(--mono); font-weight: 700; }
+/* pixel heart, colored from the theme's highlight color */
+footer .heart { width: 1.25em; height: auto; vertical-align: -0.2em; margin: 0 .15em; image-rendering: pixelated; }
+footer .heart .r { fill: var(--hi); }
+footer .heart .o { fill: color-mix(in srgb, var(--hi) 30%, #000); }
+footer .heart .s { fill: color-mix(in srgb, var(--hi) 62%, #000); }
+footer .heart .h { fill: color-mix(in srgb, var(--hi) 15%, #fff); }
 footer .made a:hover { color: var(--hi); }
 
 @media (prefers-reduced-motion: reduce) {
