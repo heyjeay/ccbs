@@ -191,6 +191,7 @@ footer .d { color: var(--g1); }
 footer .ok { color: var(--misc); }
 footer .made { margin: 14px 0 12px; color: var(--fg); }
 footer .made a { color: var(--title); font-weight: 700; }
+footer .heart { color: var(--hi); font-family: var(--mono); font-weight: 700; }
 footer .made a:hover { color: var(--hi); }
 
 @media (prefers-reduced-motion: reduce) {
