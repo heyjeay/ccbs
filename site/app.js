@@ -115,11 +115,19 @@
     if (user) rotate(); // a pick gets the full 4 minutes before the next change
   }
 
-  // The page moves on to the next theme every 4 minutes.
+  // A random theme, never the one already showing.
+  function randomTheme() {
+    if (themes.length < 2) return 0;
+    let i;
+    do { i = Math.floor(Math.random() * themes.length); } while (i === current);
+    return i;
+  }
+
+  // The page switches to another random theme every 4 minutes.
   const ROTATE_MS = 4 * 60 * 1000;
   function rotate() {
     clearInterval(rotateTimer);
-    rotateTimer = setInterval(() => setTheme(current + 1), ROTATE_MS);
+    rotateTimer = setInterval(() => setTheme(randomTheme()), ROTATE_MS);
   }
 
   fetch('themes/index.json').then((r) => r.json()).then((list) => {
@@ -149,9 +157,9 @@
       if (e.key === 'T') setTheme(current - 1, { user: true });
     });
 
-    // start where the visitor left off, or on Default
-    const saved = list.findIndex((t) => t.name === store.get('ccbs-theme'));
-    setTheme(Math.max(saved, 0));
+    // every visit opens on a random theme, never the one shown last time
+    current = list.findIndex((t) => t.name === store.get('ccbs-theme'));
+    setTheme(randomTheme());
     rotate();
   }).catch(() => {
     term.textContent = 'preview unavailable: run `go run ./cmd/sitegen` to build the theme frames.';
