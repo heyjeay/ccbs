@@ -38,8 +38,8 @@ type State struct {
 	ActiveFor time.Duration // a session counts as "now" if touched within this
 	Toast     string        // brief message shown in the top border
 	ToastTill time.Time
-	Loading   bool          // first read of the transcripts still running
-	LoadDone  int64         // bytes read so far
+	Loading   bool  // first read of the transcripts still running
+	LoadDone  int64 // bytes read so far
 	LoadTotal int64
 }
 
