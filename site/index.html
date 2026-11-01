@@ -31,7 +31,6 @@
   <main>
     <!-- Hero -->
     <section class="hero">
-      <p class="prompt"><span class="u">you@dev</span><span class="d">:</span><span class="p">~</span><span class="d">$</span> <span id="typed"></span><span class="caret">▌</span></p>
 <pre class="logo" aria-label="ccbs">
  ██████╗ ██████╗██████╗ ███████╗
 ██╔════╝██╔════╝██╔══██╗██╔════╝
@@ -42,8 +41,9 @@
       <p class="tag">claude code <b>better status</b></p>
       <h1>Your Claude Code limits, at a glance.</h1>
       <p class="lede">
-        A btop-style dashboard for your terminal. See how much of your 5-hour and weekly limits
-        you've used, when they reset, what Claude is working on right now, and where every token went.
+        Never get blindsided by a usage limit again. Watch your 5-hour and weekly limits live,
+        get a heads-up before you run out, and see exactly where every token went.
+        All without leaving your terminal.
       </p>
 
       <fieldset class="box install" id="install" style="--c: var(--box1)">
@@ -76,7 +76,6 @@
           </div>
           <div class="term" id="term" aria-label="ccbs dashboard preview showing the 5h window, weekly usage, active sessions and history"></div>
         </div>
-        <p class="caption">That's ccbs's own renderer, exported to HTML, showing demo data. <span id="autoNote">Cycling themes; pick one to stop.</span></p>
       </div>
     </section>
 
@@ -116,9 +115,11 @@
     <!-- Themes -->
     <section id="themes" class="sec">
       <h2><span class="dollar">$</span> ccbs --list-themes</h2>
-      <p class="sub">Every theme that ships with btop works in ccbs. Click one to try it on this page. Already have your own btop themes?
-        ccbs picks up <code>~/.config/btop/themes</code> too.</p>
-      <div class="themes" id="themeGrid"></div>
+      <p class="sub">42 themes built in. Press <kbd>t</kbd> in ccbs to flip through them, or pick one below to try it on this page.</p>
+      <details class="theme-list">
+        <summary><span class="when-closed">[+] show all themes</span><span class="when-open">[−] hide themes</span></summary>
+        <div class="themes" id="themeGrid"></div>
+      </details>
     </section>
 
     <!-- Usage -->

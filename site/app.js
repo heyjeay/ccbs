@@ -43,15 +43,9 @@
     setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('done'); }, 1800);
   });
 
-  // ── typed prompt ────────────────────────────────────────────────
-  const typed = $('#typed');
-  const word = 'ccbs';
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) typed.textContent = word;
-  else [...word].forEach((ch, i) => setTimeout(() => { typed.textContent += ch; }, 500 + i * 140));
-
   // ── themes ──────────────────────────────────────────────────────
   const term = $('#term'), sel = $('#themeSel'), grid = $('#themeGrid');
-  let themes = [], current = 0, auto = true, autoTimer = null, clockBase = null;
+  let themes = [], current = 0, rotateTimer = null, clockBase = null;
   const cache = new Map();
   const slug = (n) => n.toLowerCase();
 
@@ -117,20 +111,16 @@
       shown = f;
       paint();
     } finally { term.classList.remove('loading'); }
-    if (user) {
-      stopAuto();
-      store.set('ccbs-theme', t.name);
-    }
+    store.set('ccbs-theme', t.name);
+    if (user) rotate(); // a pick gets the full 4 minutes before the next change
   }
 
-  function stopAuto() {
-    auto = false;
-    clearInterval(autoTimer);
-    $('#autoNote').textContent = 'Press t in ccbs to flip through themes the same way.';
+  // The page moves on to the next theme every 4 minutes.
+  const ROTATE_MS = 4 * 60 * 1000;
+  function rotate() {
+    clearInterval(rotateTimer);
+    rotateTimer = setInterval(() => setTheme(current + 1), ROTATE_MS);
   }
-
-  // A few contrasting themes to show off while the visitor reads.
-  const TOUR = ['Default', 'tokyo-night', 'gruvbox_dark', 'nord', 'dracula', 'everforest-dark-hard', 'HotPurpleTrafficLight', 'monokai'];
 
   fetch('themes/index.json').then((r) => r.json()).then((list) => {
     themes = list;
@@ -159,19 +149,10 @@
       if (e.key === 'T') setTheme(current - 1, { user: true });
     });
 
-    const saved = store.get('ccbs-theme');
-    const savedIdx = list.findIndex((t) => t.name === saved);
-    if (savedIdx >= 0) {
-      setTheme(savedIdx);
-      stopAuto();
-    } else {
-      const tour = TOUR.map((n) => list.findIndex((t) => t.name === n)).filter((i) => i >= 0);
-      let k = 0;
-      setTheme(tour[0] ?? 0);
-      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        autoTimer = setInterval(() => { if (auto) setTheme(tour[++k % tour.length]); }, 4500);
-      } else stopAuto();
-    }
+    // start where the visitor left off, or on Default
+    const saved = list.findIndex((t) => t.name === store.get('ccbs-theme'));
+    setTheme(Math.max(saved, 0));
+    rotate();
   }).catch(() => {
     term.textContent = 'preview unavailable: run `go run ./cmd/sitegen` to build the theme frames.';
   });

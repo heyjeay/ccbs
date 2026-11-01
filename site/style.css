@@ -52,11 +52,6 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
 
 /* hero */
 .hero { text-align: center; padding: 56px 0 24px; }
-.prompt { margin: 0 0 22px; color: var(--fg); font-size: 15px; }
-.prompt .u { color: var(--g1); font-weight: 700; }
-.prompt .p { color: var(--t1); font-weight: 700; }
-.prompt .d { color: var(--text2); }
-.caret { color: var(--hi); animation: blink 1.1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .logo {
   display: inline-block; margin: 0; text-align: left;
@@ -140,7 +135,6 @@ select option { background: var(--bg); color: var(--fg); }
 .term div { height: 1.18em; }
 .term .g { font-style: normal; display: inline-block; width: 1ch; text-align: center; height: 1.18em; vertical-align: top; overflow: visible; }
 .term .g.w { width: 2ch; }
-.caption { color: var(--text2); font-size: 13px; margin: 14px 0 0; }
 
 /* sections */
 .sec { padding: 64px 0 8px; scroll-margin-top: 64px; }
@@ -165,6 +159,17 @@ select option { background: var(--bg); color: var(--fg); }
 .btn:hover { background: var(--sel-bg); color: var(--sel-fg); }
 .credit { color: var(--text2); font-size: 13px; }
 
+/* theme picker: collapsed until asked for */
+.theme-list summary {
+  display: inline-block; cursor: pointer; list-style: none; user-select: none;
+  font-weight: 700; color: var(--title); padding: 4px 10px; border: 1px solid var(--div); border-radius: 4px;
+}
+.theme-list summary::-webkit-details-marker { display: none; }
+.theme-list summary:hover { background: var(--sel-bg); color: var(--sel-fg); }
+.theme-list .when-open, .theme-list[open] .when-closed { display: none; }
+.theme-list[open] .when-open { display: inline; }
+.theme-list .themes { margin-top: 16px; }
+
 /* theme picker grid */
 .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .chip {
@@ -187,5 +192,5 @@ footer .ok { color: var(--misc); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .caret, .cursor-box { animation: none; }
+  .cursor-box { animation: none; }
 }
