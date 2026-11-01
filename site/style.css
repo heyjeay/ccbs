@@ -103,7 +103,7 @@ h1 { margin: 26px auto 0; max-width: 860px; color: var(--title); font-size: clam
 }
 .copy:hover, .copy.done { background: var(--hi); color: var(--bg); }
 .after { margin: 10px 0 0 !important; font-size: 13px; color: var(--text2); }
-.fine { color: var(--text2); font-size: 13px; margin: 14px auto 0; max-width: 680px; }
+.fine { color: color-mix(in srgb, var(--fg) 62%, var(--bg)); font-size: 13px; margin: 14px auto 0; max-width: 680px; }
 
 /* preview window */
 .preview-wrap { position: relative; margin: 48px auto 0; max-width: 1140px; }
@@ -189,6 +189,9 @@ footer { max-width: 1180px; margin: 72px auto 0; padding: 26px 20px 48px; border
 footer p { margin: 0 0 6px; }
 footer .d { color: var(--g1); }
 footer .ok { color: var(--misc); }
+footer .made { margin: 14px 0 12px; color: var(--fg); }
+footer .made a { color: var(--title); font-weight: 700; }
+footer .made a:hover { color: var(--hi); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
