@@ -67,14 +67,14 @@ func TestRenderStaleAndBackoffLabels(t *testing.T) {
 		SevenDay: &usage.LimitWindow{Utilization: 61, ResetsAt: now.Add(50 * time.Hour)},
 		Fetched:  now.Add(-20 * time.Minute),
 	}
-	st := &State{Now: now, Live: lim, LiveErr: "Anthropic is rate limiting", LiveNext: now.Add(4 * time.Minute)}
+	st := &State{Now: now, Live: lim, LiveErr: "rate limited by Anthropic", LiveNext: now.Add(4 * time.Minute)}
 	out := ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
 	if !strings.Contains(out, "live · 20m old") || !strings.Contains(out, "61%") {
 		t.Errorf("stale live data should still show, labelled with its age")
 	}
-	st = &State{Now: now, LiveErr: "Anthropic is rate limiting", LiveNext: now.Add(4 * time.Minute)}
+	st = &State{Now: now, LiveErr: "rate limited by Anthropic", LiveNext: now.Add(4 * time.Minute)}
 	out = ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
-	if !strings.Contains(out, "no live %: Anthropic is rate limiting · retry in 4m") {
+	if !strings.Contains(out, "no live %: rate limited") || !strings.Contains(out, "retry in 4m") {
 		t.Errorf("missing retry countdown")
 	}
 }

@@ -147,9 +147,9 @@ func callUsage(ctx context.Context, token string) (rawResponse, error) {
 func statusError(status int, retryAfter time.Duration) *LimitError {
 	switch {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		return &LimitError{Msg: "login expired; open Claude Code once to refresh it", Retry: 2 * time.Minute}
+		return &LimitError{Msg: "login expired, open Claude Code", Retry: 2 * time.Minute}
 	case status == http.StatusTooManyRequests:
-		return &LimitError{Msg: "Anthropic is rate limiting", Retry: max(retryAfter, 5*time.Minute), RateLimited: true}
+		return &LimitError{Msg: "rate limited by Anthropic", Retry: max(retryAfter, 5*time.Minute), RateLimited: true}
 	case status >= 500:
 		return &LimitError{Msg: fmt.Sprintf("Anthropic error %d", status), Retry: max(retryAfter, time.Minute)}
 	}

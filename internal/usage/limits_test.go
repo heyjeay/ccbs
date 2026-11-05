@@ -68,7 +68,7 @@ func fakeUsage(t *testing.T, status int, body string) {
 }
 
 func TestFetchLimitsErrorsCarryRetry(t *testing.T) {
-	for status, want := range map[int]string{401: "login expired", 429: "rate limiting", 503: "Anthropic error"} {
+	for status, want := range map[int]string{401: "login expired", 429: "rate limited", 503: "Anthropic error"} {
 		fakeUsage(t, status, `{}`)
 		_, err := FetchLimits(context.Background())
 		var le *LimitError

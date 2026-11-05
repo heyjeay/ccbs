@@ -474,16 +474,17 @@ func (f *frame) drawWeek(c *Canvas, r Rect) {
 	}
 	if y < bottom {
 		if w.Estimated {
-			msg := "rolling 7 days"
+			msg, retry := "rolling 7 days", ""
 			if f.LiveErr != "" && !f.Demo {
 				msg = "no live %: " + f.LiveErr
 				if wait := f.LiveNext.Sub(f.Now); wait > 0 {
-					msg += " · retry in " + fmtDur(wait)
+					retry = "retry in " + fmtDur(wait)
+					c.TextRight(right, y, retry, Style{FG: th.MainFG})
 				}
 			} else if f.Offline {
 				msg = "rolling 7 days · offline, no live %"
 			}
-			c.Text(x, y, Truncate(msg, in.W-2), lbl, 0)
+			c.Text(x, y, Truncate(msg, in.W-3-Width(retry)), lbl, 0)
 		} else if w.NoReset {
 			c.Text(x, y, "live % · reset time not given", lbl, 0)
 		} else {
