@@ -117,3 +117,57 @@ func TestDiagnoseNeverPrintsToken(t *testing.T) {
 		t.Errorf("401 not explained:\n%s", buf.String())
 	}
 }
+
+func TestPollLimitsSharesCacheAndBacksOff(t *testing.T) {
+	t.Setenv("CCBS_CACHE_DIR", t.TempDir())
+	calls := 0
+	status := 429
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if status == 429 {
+			w.Header().Set("Retry-After", "600")
+			w.WriteHeader(429)
+			return
+		}
+		w.Write([]byte(`{"five_hour":{"utilization":5,"resets_at":"2030-01-01T00:00:00Z"},"seven_day":{"utilization":9,"resets_at":"2030-01-02T00:00:00Z"}}`))
+	}))
+	defer srv.Close()
+	old := usageURL
+	usageURL = srv.URL
+	defer func() { usageURL = old }()
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	// rate limited: honours Retry-After (10 min) and doesn't ask again meanwhile
+	_, next, err := PollLimits(context.Background())
+	var le *LimitError
+	if !errors.As(err, &le) || !le.RateLimited || time.Until(next) < 9*time.Minute {
+		t.Fatalf("429: next in %s, err %v", time.Until(next), err)
+	}
+	for i := 0; i < 5; i++ { // other windows / restarts
+		if _, _, err := PollLimits(context.Background()); err == nil {
+			t.Fatal("expected the remembered error while backing off")
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("made %d requests while backing off, want 1", calls)
+	}
+
+	// back-off over: one request, then everyone shares the cached result
+	c := loadLimitCache()
+	c.NotBefore = time.Now().Add(-time.Second)
+	c.save()
+	status = 200
+	l, next, err := PollLimits(context.Background())
+	if err != nil || l.SevenDay.Utilization != 9 || time.Until(next) < PollEvery-time.Second {
+		t.Fatalf("ok poll: %v %+v next %s", err, l, time.Until(next))
+	}
+	for i := 0; i < 5; i++ {
+		PollLimits(context.Background())
+	}
+	if calls != 2 {
+		t.Fatalf("made %d requests, want 2 (cache should be shared)", calls)
+	}
+	if got := CachedLimits(); got == nil || got.SevenDay.Utilization != 9 {
+		t.Fatal("restart should see the cached limits")
+	}
+}

@@ -103,11 +103,11 @@ func main() {
 	if *snapshot {
 		st := &ui.State{Now: now, Snap: src.Refresh(), Interval: *interval, Demo: *demo, Live: demoLimits, Offline: *offline}
 		if !*demo && !*offline {
-			l, err := usage.FetchLimits(context.Background())
+			l, next, err := usage.PollLimits(context.Background())
 			if err != nil {
 				st.LiveErr = err.Error()
 			}
-			st.Live = l
+			st.Live, st.LiveNext = l, next
 		}
 		fmt.Println(ui.Render(st, *width, *height, theme))
 		return

@@ -59,3 +59,22 @@ func TestRenderLoadingOverlay(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderStaleAndBackoffLabels(t *testing.T) {
+	now := time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	lim := &usage.Limits{
+		FiveHour: &usage.LimitWindow{Utilization: 40, ResetsAt: now.Add(2 * time.Hour)},
+		SevenDay: &usage.LimitWindow{Utilization: 61, ResetsAt: now.Add(50 * time.Hour)},
+		Fetched:  now.Add(-20 * time.Minute),
+	}
+	st := &State{Now: now, Live: lim, LiveErr: "Anthropic is rate limiting", LiveNext: now.Add(4 * time.Minute)}
+	out := ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
+	if !strings.Contains(out, "live · 20m old") || !strings.Contains(out, "61%") {
+		t.Errorf("stale live data should still show, labelled with its age")
+	}
+	st = &State{Now: now, LiveErr: "Anthropic is rate limiting", LiveNext: now.Add(4 * time.Minute)}
+	out = ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
+	if !strings.Contains(out, "no live %: Anthropic is rate limiting · retry in 4m") {
+		t.Errorf("missing retry countdown")
+	}
+}

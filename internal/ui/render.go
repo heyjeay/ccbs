@@ -38,9 +38,10 @@ type State struct {
 	ActiveFor time.Duration // a session counts as "now" if touched within this
 	Toast     string        // brief message shown in the top border
 	ToastTill time.Time
-	Offline   bool  // --offline: live limits deliberately not fetched
-	Loading   bool  // first read of the transcripts still running
-	LoadDone  int64 // bytes read so far
+	Offline   bool      // --offline: live limits deliberately not fetched
+	LiveNext  time.Time // when live limits will next be fetched
+	Loading   bool      // first read of the transcripts still running
+	LoadDone  int64     // bytes read so far
 	LoadTotal int64
 }
 
@@ -153,6 +154,10 @@ func (f *frame) sourceTag() []Tag {
 	case f.Demo:
 		return []Tag{{Text: "● ", FG: th.Temp.At(1)}, {Text: "demo"}}
 	case f.Live != nil:
+		if age := f.Now.Sub(f.Live.Fetched); age > 2*usage.PollEvery {
+			// last good numbers, kept while Anthropic can't be asked
+			return []Tag{{Text: "● ", FG: th.Warn()}, {Text: "live · " + fmtDur(age) + " old"}}
+		}
 		return []Tag{{Text: "● ", FG: th.Ok()}, {Text: "live"}}
 	}
 	return []Tag{{Text: "● ", FG: th.Warn()}, {Text: "local est."}}
@@ -472,6 +477,9 @@ func (f *frame) drawWeek(c *Canvas, r Rect) {
 			msg := "rolling 7 days"
 			if f.LiveErr != "" && !f.Demo {
 				msg = "no live %: " + f.LiveErr
+				if wait := f.LiveNext.Sub(f.Now); wait > 0 {
+					msg += " · retry in " + fmtDur(wait)
+				}
 			} else if f.Offline {
 				msg = "rolling 7 days · offline, no live %"
 			}

@@ -3,7 +3,6 @@ package ui
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -48,8 +47,9 @@ type Options struct {
 }
 
 type liveResult struct {
-	l   *usage.Limits
-	err error
+	l    *usage.Limits
+	next time.Time
+	err  error
 }
 
 // Run takes over the terminal (alt screen, raw mode) until the user quits.
@@ -91,21 +91,24 @@ func Run(opt Options) error {
 	}
 	live := make(chan liveResult, 1)
 	fetching := false
-	var nextFetch time.Time // after a failure, wait before asking again
+	var nextFetch time.Time // when the shared cache says it's worth asking again
 	fetch := func() {
 		if !opt.Live || fetching || time.Now().Before(nextFetch) {
 			return
 		}
 		fetching = true
 		go func() {
-			l, err := usage.FetchLimits(context.Background())
-			live <- liveResult{l, err}
+			l, next, err := usage.PollLimits(context.Background())
+			live <- liveResult{l, next, err}
 		}()
 	}
 
 	// Draw straight away and read history in the background: a big
 	// ~/.claude/projects can take a moment, and a blank screen looks hung.
 	st.Loading = true
+	if opt.Live {
+		st.Live = usage.CachedLimits() // last known numbers, shown instantly
+	}
 	fetch()
 
 	w, h, _ := term.GetSize(int(out.Fd()))
@@ -158,10 +161,8 @@ func Run(opt Options) error {
 				loading = true
 				load()
 			}
-			if st.Live == nil || time.Since(st.Live.Fetched) > 60*time.Second {
-				if !st.Demo {
-					fetch()
-				}
+			if !st.Demo {
+				fetch() // no-op until the next allowed time
 			}
 			draw()
 		case snap := <-data:
@@ -170,19 +171,13 @@ func Run(opt Options) error {
 			draw()
 		case r := <-live:
 			fetching = false
+			nextFetch, st.LiveNext = r.next, r.next
+			if r.l != nil {
+				st.Live = r.l // may be the last good result while backing off
+			}
+			st.LiveErr = ""
 			if r.err != nil {
 				st.LiveErr = r.err.Error()
-				retry := time.Minute
-				var le *usage.LimitError
-				if errors.As(r.err, &le) && le.Retry > 0 {
-					retry = le.Retry
-				}
-				nextFetch = time.Now().Add(retry)
-				if st.Live != nil && time.Since(st.Live.Fetched) > 10*time.Minute {
-					st.Live = nil // too stale to trust
-				}
-			} else {
-				st.Live, st.LiveErr = r.l, ""
 			}
 			draw()
 		case k, ok := <-keys:
@@ -233,7 +228,7 @@ func Run(opt Options) error {
 					loading = true
 					load()
 				}
-				nextFetch = time.Time{} // a manual refresh retries right away
+				nextFetch = time.Time{} // re-check the shared cache now (its back-off still applies)
 				fetch()
 			}
 			draw()

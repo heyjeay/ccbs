@@ -18,18 +18,18 @@ import (
 
 // LimitWindow is one bucket of the subscription rate limit.
 type LimitWindow struct {
-	Utilization float64   // percent
-	ResetsAt    time.Time // zero when Anthropic didn't say
+	Utilization float64   `json:"utilization"` // percent
+	ResetsAt    time.Time `json:"resets_at"`   // zero when Anthropic didn't say
 }
 
 // Limits is the account's live plan usage, as reported by Anthropic (the
 // same numbers Claude Code's /usage screen shows).
 type Limits struct {
-	FiveHour       *LimitWindow
-	SevenDay       *LimitWindow
-	SevenDayOpus   *LimitWindow
-	SevenDaySonnet *LimitWindow
-	Fetched        time.Time
+	FiveHour       *LimitWindow `json:"five_hour,omitempty"`
+	SevenDay       *LimitWindow `json:"seven_day,omitempty"`
+	SevenDayOpus   *LimitWindow `json:"seven_day_opus,omitempty"`
+	SevenDaySonnet *LimitWindow `json:"seven_day_sonnet,omitempty"`
+	Fetched        time.Time    `json:"fetched"`
 }
 
 var usageURL = "https://api.anthropic.com/api/oauth/usage"
@@ -38,8 +38,9 @@ var ErrNoCredentials = errors.New("no Claude Code login found")
 
 // LimitError is a failed fetch, with how long to wait before trying again.
 type LimitError struct {
-	Msg   string
-	Retry time.Duration
+	Msg         string
+	Retry       time.Duration
+	RateLimited bool
 }
 
 func (e *LimitError) Error() string { return e.Msg }
@@ -104,9 +105,24 @@ func readCredentials() (credentials, error) {
 
 // rawResponse is the endpoint's reply plus how long it took.
 type rawResponse struct {
-	status  int
-	body    []byte
-	elapsed time.Duration
+	status     int
+	body       []byte
+	elapsed    time.Duration
+	retryAfter time.Duration // from the Retry-After header, if any
+}
+
+func parseRetryAfter(v string) time.Duration {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0
+	}
+	if secs, err := time.ParseDuration(v + "s"); err == nil && secs > 0 {
+		return secs
+	}
+	if t, err := http.ParseTime(v); err == nil {
+		return time.Until(t)
+	}
+	return 0
 }
 
 func callUsage(ctx context.Context, token string) (rawResponse, error) {
@@ -124,19 +140,20 @@ func callUsage(ctx context.Context, token string) (rawResponse, error) {
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	return rawResponse{status: resp.StatusCode, body: body, elapsed: time.Since(start)}, err
+	return rawResponse{status: resp.StatusCode, body: body, elapsed: time.Since(start),
+		retryAfter: parseRetryAfter(resp.Header.Get("Retry-After"))}, err
 }
 
-func statusError(status int) *LimitError {
+func statusError(status int, retryAfter time.Duration) *LimitError {
 	switch {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		return &LimitError{"login expired; open Claude Code once to refresh it", 2 * time.Minute}
+		return &LimitError{Msg: "login expired; open Claude Code once to refresh it", Retry: 2 * time.Minute}
 	case status == http.StatusTooManyRequests:
-		return &LimitError{"Anthropic is rate limiting; retrying in 5m", 5 * time.Minute}
+		return &LimitError{Msg: "Anthropic is rate limiting", Retry: max(retryAfter, 5*time.Minute), RateLimited: true}
 	case status >= 500:
-		return &LimitError{fmt.Sprintf("Anthropic error %d; retrying", status), time.Minute}
+		return &LimitError{Msg: fmt.Sprintf("Anthropic error %d", status), Retry: max(retryAfter, time.Minute)}
 	}
-	return &LimitError{fmt.Sprintf("usage endpoint returned %d", status), 5 * time.Minute}
+	return &LimitError{Msg: fmt.Sprintf("usage endpoint returned %d", status), Retry: 5 * time.Minute}
 }
 
 // parseLimits reads whatever windows the reply contains. It tolerates null
@@ -183,18 +200,18 @@ func parseLimits(body []byte) (*Limits, map[string]*LimitWindow, error) {
 func FetchLimits(ctx context.Context) (*Limits, error) {
 	c, err := readCredentials()
 	if err != nil {
-		return nil, &LimitError{err.Error() + "; sign in to Claude Code", 2 * time.Minute}
+		return nil, &LimitError{Msg: err.Error() + "; sign in to Claude Code", Retry: 2 * time.Minute}
 	}
 	r, err := callUsage(ctx, c.token)
 	if err != nil {
-		return nil, &LimitError{"can't reach api.anthropic.com", time.Minute}
+		return nil, &LimitError{Msg: "can't reach api.anthropic.com", Retry: time.Minute}
 	}
 	if r.status != http.StatusOK {
-		return nil, statusError(r.status)
+		return nil, statusError(r.status, r.retryAfter)
 	}
 	l, _, err := parseLimits(r.body)
 	if err != nil {
-		return nil, &LimitError{err.Error(), 5 * time.Minute}
+		return nil, &LimitError{Msg: err.Error(), Retry: 5 * time.Minute}
 	}
 	return l, nil
 }
@@ -233,6 +250,9 @@ func Diagnose(ctx context.Context, w io.Writer) {
 		return
 	}
 	ok("Claude Code login found in %s", c.source)
+	if lc := loadLimitCache(); time.Now().Before(lc.NotBefore) {
+		info("ccbs is holding off until %s (%s); this check asks anyway", lc.NotBefore.Local().Format("15:04:05"), lc.LastError)
+	}
 	if !c.expires.IsZero() {
 		if d := time.Until(c.expires); d > 0 {
 			info("access token valid for another %s", fmtDuration(d))
@@ -249,7 +269,11 @@ func Diagnose(ctx context.Context, w io.Writer) {
 	}
 	if r.status != http.StatusOK {
 		bad("usage endpoint answered %d %s (%s)", r.status, http.StatusText(r.status), r.elapsed.Round(time.Millisecond))
-		info("%s", statusError(r.status).Msg)
+		le := statusError(r.status, r.retryAfter)
+		info("%s; ccbs will wait %s before asking again", le.Msg, fmtDuration(le.Retry))
+		if le.RateLimited {
+			info("tip: close extra ccbs windows; they share one cached result from v0.1.3 on.")
+		}
 		if snippet := strings.TrimSpace(string(r.body)); snippet != "" {
 			if len(snippet) > 300 {
 				snippet = snippet[:300] + "…"
