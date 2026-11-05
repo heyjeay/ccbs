@@ -38,6 +38,7 @@ type State struct {
 	ActiveFor time.Duration // a session counts as "now" if touched within this
 	Toast     string        // brief message shown in the top border
 	ToastTill time.Time
+	Offline   bool  // --offline: live limits deliberately not fetched
 	Loading   bool  // first read of the transcripts still running
 	LoadDone  int64 // bytes read so far
 	LoadTotal int64
@@ -468,12 +469,20 @@ func (f *frame) drawWeek(c *Canvas, r Rect) {
 	}
 	if y < bottom {
 		if w.Estimated {
-			c.Text(x, y, "rolling 7 days", lbl, 0)
+			msg := "rolling 7 days"
+			if f.LiveErr != "" && !f.Demo {
+				msg = "no live %: " + f.LiveErr
+			} else if f.Offline {
+				msg = "rolling 7 days · offline, no live %"
+			}
+			c.Text(x, y, Truncate(msg, in.W-2), lbl, 0)
+		} else if w.NoReset {
+			c.Text(x, y, "live % · reset time not given", lbl, 0)
 		} else {
 			c.Text(x, y, "resets", lbl, 0)
 			c.Text(x+7, y, w.End.In(f.Now.Location()).Format("Mon 15:04"), Style{FG: th.Title, Bold: true}, 0)
 		}
-		if !w.Estimated {
+		if !w.Estimated && !w.NoReset {
 			c.TextRight(right, y, "in "+fmtDur(w.Remaining(f.Now)), Style{FG: th.MainFG})
 		}
 		y++

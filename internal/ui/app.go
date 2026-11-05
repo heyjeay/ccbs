@@ -3,6 +3,7 @@ package ui
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -73,7 +74,7 @@ func Run(opt Options) error {
 		term.Restore(in, old)
 	}()
 
-	st := &State{Interval: opt.Interval, Now: time.Now()}
+	st := &State{Interval: opt.Interval, Now: time.Now(), Offline: !opt.Live && opt.Demo == nil}
 	if opt.Demo != nil {
 		st.Demo, st.Live = true, opt.Demo
 	}
@@ -90,8 +91,9 @@ func Run(opt Options) error {
 	}
 	live := make(chan liveResult, 1)
 	fetching := false
+	var nextFetch time.Time // after a failure, wait before asking again
 	fetch := func() {
-		if !opt.Live || fetching {
+		if !opt.Live || fetching || time.Now().Before(nextFetch) {
 			return
 		}
 		fetching = true
@@ -170,6 +172,12 @@ func Run(opt Options) error {
 			fetching = false
 			if r.err != nil {
 				st.LiveErr = r.err.Error()
+				retry := time.Minute
+				var le *usage.LimitError
+				if errors.As(r.err, &le) && le.Retry > 0 {
+					retry = le.Retry
+				}
+				nextFetch = time.Now().Add(retry)
 				if st.Live != nil && time.Since(st.Live.Fetched) > 10*time.Minute {
 					st.Live = nil // too stale to trust
 				}
@@ -225,6 +233,7 @@ func Run(opt Options) error {
 					loading = true
 					load()
 				}
+				nextFetch = time.Time{} // a manual refresh retries right away
 				fetch()
 			}
 			draw()

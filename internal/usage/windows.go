@@ -61,6 +61,10 @@ func FiveHourWindow(snap Snapshot, now time.Time, live *Limits) (w Window, activ
 		return w, true
 	}
 	blocks := Blocks(snap.Entries)
+	if live != nil && live.FiveHour != nil {
+		// live % without a reset time: trust the %, reconstruct the window
+		defer func() { w.Utilization, w.Estimated = live.FiveHour.Utilization, false }()
+	}
 	w.Utilization = -1
 	w.Estimated = true
 	if n := len(blocks); n > 0 && now.Before(blocks[n-1].End) {
@@ -91,6 +95,12 @@ func WeeklyWindow(snap Snapshot, now time.Time, live *Limits) Window {
 		w.End = live.SevenDay.ResetsAt
 		w.Start = w.End.Add(-Week)
 		w.Utilization = live.SevenDay.Utilization
+	} else if live != nil && live.SevenDay != nil {
+		// live % but no reset time: show the %, over a rolling week
+		w.End = now
+		w.Start = now.Add(-Week)
+		w.Utilization = live.SevenDay.Utilization
+		w.NoReset = true
 	} else {
 		w.End = now
 		w.Start = now.Add(-Week)

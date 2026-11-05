@@ -33,6 +33,7 @@ func main() {
 		height     = flag.Int("height", 40, "frame height for --snapshot")
 		at         = flag.String("at", "", "with --demo --snapshot: pretend the clock reads this RFC3339 time")
 		showVer    = flag.Bool("version", false, "print version")
+		doctor     = flag.Bool("doctor", false, "check why live 5h/weekly limits do or don't work, then exit")
 	)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "ccbs %s — Claude Code better status\n\nusage: ccbs [flags]\n\n", version)
@@ -42,6 +43,10 @@ func main() {
 	flag.Parse()
 	if *showVer {
 		fmt.Println("ccbs", version)
+		return
+	}
+	if *doctor {
+		usage.Diagnose(context.Background(), os.Stdout)
 		return
 	}
 	if *listThemes {
@@ -96,7 +101,7 @@ func main() {
 	}
 
 	if *snapshot {
-		st := &ui.State{Now: now, Snap: src.Refresh(), Interval: *interval, Demo: *demo, Live: demoLimits}
+		st := &ui.State{Now: now, Snap: src.Refresh(), Interval: *interval, Demo: *demo, Live: demoLimits, Offline: *offline}
 		if !*demo && !*offline {
 			l, err := usage.FetchLimits(context.Background())
 			if err != nil {
