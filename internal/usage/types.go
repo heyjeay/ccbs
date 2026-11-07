@@ -136,6 +136,7 @@ type Window struct {
 	Utilization float64 // 0-100, -1 when unknown
 	Estimated   bool    // utilization derived locally rather than from the API
 	NoReset     bool    // live utilization, but Anthropic gave no reset time
+	Approx      bool    // live reading carried forward from local usage ("~")
 	Tokens      Tokens
 	Cost        float64
 	Calls       int

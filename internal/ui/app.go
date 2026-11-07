@@ -108,25 +108,23 @@ func Run(opt Options) error {
 	// Draw straight away and read history in the background: a big
 	// ~/.claude/projects can take a moment, and a blank screen looks hung.
 	st.Loading = true
-	// Best source: what Claude Code itself reported through its status line
-	// (`ccbs setup`). Otherwise fall back to asking Anthropic's usage API.
-	fromStatusline := func() bool {
+	// Live limits: the newest real reading from either source (Claude Code's
+	// status line, or the usage API), carried forward from local usage since.
+	// The API is only asked while the status line is quiet, which is always
+	// the case for the Claude desktop app (it doesn't run status lines).
+	refreshLive := func(mayFetch bool) {
 		if !opt.Live {
-			return false
+			return
 		}
-		if l := usage.StatuslineLimits(time.Now()); l != nil {
-			st.Live, st.LiveErr = l, ""
-			return true
+		now := time.Now()
+		st.Live = usage.Extrapolate(usage.LatestReading(now), st.Snap.Entries, now)
+		if !usage.NeedsAPI(now) {
+			st.LiveErr = ""
+		} else if mayFetch {
+			fetch() // no-op until the shared cache allows another request
 		}
-		return false
 	}
-	// With `ccbs setup` done, Claude Code is the source; the usage API is only
-	// for people who haven't set it up (it rate limits, so don't mix them).
-	useAPI := opt.Live && !opt.HookInstalled
-	if opt.Live && !fromStatusline() && useAPI {
-		st.Live = usage.CachedLimits() // last known numbers, shown instantly
-		fetch()
-	}
+	refreshLive(true)
 
 	w, h, _ := term.GetSize(int(out.Fd()))
 	draw := func() {
@@ -178,27 +176,25 @@ func Run(opt Options) error {
 				loading = true
 				load()
 			}
-			if !st.Demo && !fromStatusline() && useAPI {
-				fetch() // no-op until the next allowed time
+			if !st.Demo {
+				refreshLive(true)
 			}
 			draw()
 		case snap := <-data:
 			loading, st.Loading = false, false
 			st.Snap = snap
+			if !st.Demo {
+				refreshLive(false) // new local usage moves the estimate
+			}
 			draw()
 		case r := <-live:
 			fetching = false
 			nextFetch, st.LiveNext = r.next, r.next
-			if st.Live != nil && st.Live.Source == usage.SourceStatusline {
-				break // status line data arrived meanwhile; it wins
-			}
-			if r.l != nil {
-				st.Live = r.l // may be the last good result while backing off
-			}
 			st.LiveErr = ""
 			if r.err != nil {
 				st.LiveErr = r.err.Error()
 			}
+			refreshLive(false) // pick up what that request stored
 			draw()
 		case k, ok := <-keys:
 			if !ok {
@@ -249,9 +245,7 @@ func Run(opt Options) error {
 					load()
 				}
 				nextFetch = time.Time{} // re-check the shared cache now (its back-off still applies)
-				if !fromStatusline() && useAPI {
-					fetch()
-				}
+				refreshLive(true)
 			}
 			draw()
 		}

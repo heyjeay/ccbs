@@ -120,15 +120,14 @@ func main() {
 		if !*demo && !*offline {
 			hooked, _ := hook.Status()
 			st.HookInstalled = hooked
-			if l := usage.StatuslineLimits(time.Now()); l != nil {
-				st.Live = l
-			} else if !hooked {
-				l, next, err := usage.PollLimits(context.Background())
+			if usage.NeedsAPI(now) {
+				_, next, err := usage.PollLimits(context.Background())
 				if err != nil {
 					st.LiveErr = err.Error()
 				}
-				st.Live, st.LiveNext = l, next
+				st.LiveNext = next
 			}
+			st.Live = usage.Extrapolate(usage.LatestReading(now), st.Snap.Entries, now)
 		}
 		fmt.Println(ui.Render(st, *width, *height, theme))
 		return

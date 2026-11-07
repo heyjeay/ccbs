@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// PollEvery is how often ccbs asks Anthropic for live limits. The % moves
-// slowly and the token counts update from local logs in between, so there is
-// no reason to ask more often (the endpoint rate limits eagerly).
-const PollEvery = 3 * time.Minute
+// PollEvery is how often ccbs asks Anthropic's usage API. The endpoint rate
+// limits eagerly, and between readings ccbs estimates from local usage
+// (see Extrapolate), so there is no reason to ask more often.
+const PollEvery = 10 * time.Minute
 
 // MaxLimitAge is how long a remembered result is still worth showing.
 const MaxLimitAge = 12 * time.Hour

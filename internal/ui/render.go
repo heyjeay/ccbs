@@ -155,9 +155,10 @@ func (f *frame) sourceTag() []Tag {
 	case f.Demo:
 		return []Tag{{Text: "● ", FG: th.Temp.At(1)}, {Text: "demo"}}
 	case f.Live != nil:
-		if age := f.Now.Sub(f.Live.Fetched); f.Live.Source != usage.SourceStatusline && age > 2*usage.PollEvery {
-			// last good numbers, kept while Anthropic can't be asked
-			return []Tag{{Text: "● ", FG: th.Warn()}, {Text: "live · " + fmtDur(age) + " old"}}
+		// age of the newest real reading; between readings the % is carried
+		// forward from local usage and shown with a "~"
+		if age := f.Now.Sub(f.Live.Fetched); age > 15*time.Minute {
+			return []Tag{{Text: "● ", FG: th.Warn()}, {Text: "live · read " + fmtDur(age) + " ago"}}
 		}
 		return []Tag{{Text: "● ", FG: th.Ok()}, {Text: "live"}}
 	}
@@ -287,7 +288,7 @@ func (f *frame) drawFiveStats(c *Canvas, r Rect, boxed bool) {
 		mw := r.W - 13
 		if util >= 0 {
 			c.Meter(x+5, y, mw, util/100, th, th.Heat)
-			c.TextRight(right, y, fmtPct(util), Style{FG: th.Heat(util / 100), Bold: true})
+			c.TextRight(right, y, fmtPctApprox(util, w.Approx), Style{FG: th.Heat(util / 100), Bold: true})
 		} else {
 			c.Meter(x+5, y, mw, 0, th, th.Heat)
 			c.TextRight(right, y, "  —", val)
@@ -456,39 +457,36 @@ func (f *frame) drawWeek(c *Canvas, r Rect) {
 	w := f.week
 	bottom := in.Y + in.H
 
-	meter := func(name string, v float64) {
+	meter := func(name string, v float64, approx bool) {
 		if y >= bottom {
 			return
 		}
 		c.Text(x, y, name, lbl, 0)
 		mw := in.W - 15
 		c.Meter(x+8, y, mw, math.Max(v, 0)/100, th, grad)
-		c.TextRight(right, y, fmtPct(v), Style{FG: grad(math.Max(v, 0) / 100), Bold: true})
+		c.TextRight(right, y, fmtPctApprox(v, approx), Style{FG: grad(math.Max(v, 0) / 100), Bold: true})
 		y++
 	}
-	meter("all", w.Utilization)
+	meter("all", w.Utilization, w.Approx)
 	if f.Live != nil && f.Live.SevenDayOpus != nil && in.H >= 10 {
-		meter("opus", f.Live.SevenDayOpus.Utilization)
+		meter("opus", f.Live.SevenDayOpus.Utilization, false)
 	}
 	if f.Live != nil && f.Live.SevenDaySonnet != nil && in.H >= 10 {
-		meter("sonnet", f.Live.SevenDaySonnet.Utilization)
+		meter("sonnet", f.Live.SevenDaySonnet.Utilization, false)
 	}
 	if y < bottom {
 		if w.Estimated {
 			msg, retry := "rolling 7 days", ""
-			if f.HookInstalled && !f.Demo && !f.Offline {
-				msg = "no live % yet: waiting for Claude Code's next reply"
-			} else if f.LiveErr != "" && !f.Demo {
+			if f.LiveErr != "" && !f.Demo {
 				msg = "no live %: " + f.LiveErr
-				if !f.HookInstalled {
-					msg = "no live %: run `ccbs setup`"
-				}
 				if wait := f.LiveNext.Sub(f.Now); wait > 0 {
 					retry = "retry in " + fmtDur(wait)
 					c.TextRight(right, y, retry, Style{FG: th.MainFG})
 				}
 			} else if f.Offline {
 				msg = "rolling 7 days · offline, no live %"
+			} else if !f.Demo {
+				msg = "no live % yet: asking Anthropic…"
 			}
 			c.Text(x, y, Truncate(msg, in.W-3-Width(retry)), lbl, 0)
 		} else if w.NoReset {

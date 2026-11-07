@@ -57,6 +57,7 @@ func FiveHourWindow(snap Snapshot, now time.Time, live *Limits) (w Window, activ
 		w.End = live.FiveHour.ResetsAt
 		w.Start = w.End.Add(-FiveHours)
 		w.Utilization = live.FiveHour.Utilization
+		w.Approx = live.FiveHour.Approx
 		w.Tokens, w.Cost, w.Calls = sum(snap.Entries, w.Start, w.End)
 		return w, true
 	}
@@ -95,6 +96,7 @@ func WeeklyWindow(snap Snapshot, now time.Time, live *Limits) Window {
 		w.End = live.SevenDay.ResetsAt
 		w.Start = w.End.Add(-Week)
 		w.Utilization = live.SevenDay.Utilization
+		w.Approx = live.SevenDay.Approx
 	} else if live != nil && live.SevenDay != nil {
 		// live % but no reset time: show the %, over a rolling week
 		w.End = now

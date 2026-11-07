@@ -69,23 +69,29 @@ func TestRenderStaleAndBackoffLabels(t *testing.T) {
 	}
 	st := &State{Now: now, Live: lim, LiveErr: "rate limited by Anthropic", LiveNext: now.Add(4 * time.Minute)}
 	out := ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
-	if !strings.Contains(out, "live · 20m old") || !strings.Contains(out, "61%") {
+	if !strings.Contains(out, "live · read 20m ago") || !strings.Contains(out, "61%") {
 		t.Errorf("stale live data should still show, labelled with its age")
 	}
-	// API fallback failing (no `ccbs setup`): point at the fix, show the retry
+	// API failing and no reading yet: say why, and when it tries again
 	st = &State{Now: now, LiveErr: "rate limited by Anthropic", LiveNext: now.Add(4 * time.Minute)}
 	out = ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
-	if !strings.Contains(out, "no live %: run `ccbs setup`") || !strings.Contains(out, "retry in 4m") {
-		t.Errorf("missing setup hint or retry countdown")
+	if !strings.Contains(out, "no live %: rate limited") || !strings.Contains(out, "retry in 4m") {
+		t.Errorf("missing error or retry countdown")
 	}
 }
 
-func TestRenderWaitingForClaudeCode(t *testing.T) {
+func TestRenderWaitingAndApprox(t *testing.T) {
 	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
-	// set up, no numbers yet: never show the API's error, say what's happening
-	st := &State{Now: now, HookInstalled: true, LiveErr: "rate limited by Anthropic"}
+	st := &State{Now: now, HookInstalled: true}
 	out := ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
-	if !strings.Contains(out, "no live % yet: waiting for Claude Code") || strings.Contains(out, "rate limited") {
+	if !strings.Contains(out, "no live % yet: asking Anthropic") {
 		t.Errorf("waiting state wrong")
+	}
+	// a carried-forward estimate is marked with ~
+	st.Live = &usage.Limits{Fetched: now.Add(-time.Hour),
+		SevenDay: &usage.LimitWindow{Utilization: 64.4, ResetsAt: now.Add(48 * time.Hour), Approx: true}}
+	out = ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
+	if !strings.Contains(out, "~64%") || !strings.Contains(out, "live · read 1h 00m ago") {
+		t.Errorf("approx weekly not shown")
 	}
 }

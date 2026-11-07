@@ -90,6 +90,14 @@ func fmtWhenShort(now, t time.Time) string {
 	return t.Format("01/02")
 }
 
+// fmtPctApprox marks a carried-forward estimate with "~".
+func fmtPctApprox(v float64, approx bool) string {
+	if v >= 0 && approx {
+		return fmt.Sprintf("~%.0f%%", v)
+	}
+	return fmtPct(v)
+}
+
 func fmtPct(v float64) string {
 	if v < 0 {
 		return "  —"

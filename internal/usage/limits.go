@@ -20,6 +20,10 @@ import (
 type LimitWindow struct {
 	Utilization float64   `json:"utilization"` // percent
 	ResetsAt    time.Time `json:"resets_at"`   // zero when Anthropic didn't say
+	// Set when merging readings (not stored): when this % was read, and
+	// whether Utilization has been carried forward from local usage since.
+	AsOf   time.Time `json:"-"`
+	Approx bool      `json:"-"`
 }
 
 // Limits is the account's live plan usage, as reported by Anthropic (the
@@ -255,8 +259,9 @@ func Diagnose(ctx context.Context, w io.Writer, hookInstalled bool, statusLineCm
 		switch {
 		case sc.LastCall.IsZero():
 			bad("Claude Code hasn't run `ccbs statusline` yet")
-			info("open (or restart) Claude Code and send any message; its status line runs ccbs.")
-			info("if it still doesn't, check the status line under the prompt box for an error.")
+			info("only `claude` in a terminal runs status lines; the Claude desktop app doesn't.")
+			info("that's fine: ccbs then uses the usage API below and estimates in between.")
+			info("for exact numbers now and then, send a message from `claude` in a terminal.")
 		case sc.Received.IsZero():
 			ok("Claude Code ran `ccbs statusline` %s ago (Claude Code %s)", fmtDuration(time.Since(sc.LastCall)), sc.Version)
 			bad("but it didn't include any rate limits")
@@ -278,18 +283,22 @@ func Diagnose(ctx context.Context, w io.Writer, hookInstalled bool, statusLineCm
 			}
 		}
 	} else {
-		bad("Claude Code's status line doesn't run ccbs")
+		info("  Claude Code's status line doesn't run ccbs (optional)")
 		if statusLineCmd != "" {
 			info("current status line: %s (ccbs setup keeps showing it)", statusLineCmd)
 		}
-		info("run `ccbs setup` so Claude Code hands ccbs your limits directly:")
-		info("no requests to Anthropic, no rate limits, no login problems.")
+		info("if you use `claude` in a terminal, `ccbs setup` lets it hand ccbs exact limits")
+		info("on every reply. The desktop app doesn't run status lines; the API covers it.")
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "fallback: Anthropic usage API")
-	if hookInstalled && StatuslineLimits(time.Now()) != nil {
+	if !NeedsAPI(time.Now()) {
 		info("skipped: not needed while the status line is delivering limits")
 		return
+	}
+	info("used while the status line is quiet: at most every %s, shared by all ccbs windows", fmtDuration(PollEvery))
+	if l := LatestReading(time.Now()); l != nil {
+		info("last real reading: %s ago; ccbs shows \"~\" estimates from your local usage since", fmtDuration(time.Since(l.Fetched)))
 	}
 
 	c, err := readCredentials()

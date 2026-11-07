@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -201,5 +202,62 @@ func TestRecordStatusline(t *testing.T) {
 	}
 	if _, err := RecordStatusline([]byte(`not json`), now); err == nil {
 		t.Error("bad input should error (and the caller still prints a line)")
+	}
+}
+
+func TestLatestReadingPrefersNewestPerWindow(t *testing.T) {
+	t.Setenv("CCBS_CACHE_DIR", t.TempDir())
+	now := time.Now()
+	// API read 20 minutes ago: both windows
+	limitCache{Limits: &Limits{Fetched: now.Add(-20 * time.Minute),
+		FiveHour: &LimitWindow{Utilization: 10, ResetsAt: now.Add(time.Hour)},
+		SevenDay: &LimitWindow{Utilization: 50, ResetsAt: now.Add(48 * time.Hour)},
+	}}.save()
+	l := LatestReading(now)
+	if l == nil || l.SevenDay.Utilization != 50 || l.Source != "" || !l.SevenDay.AsOf.Equal(now.Add(-20*time.Minute)) {
+		t.Fatalf("api only: %+v", l)
+	}
+	if !NeedsAPI(now) {
+		t.Error("no status line data: the API is needed")
+	}
+	// then the status line reports only the weekly window, more recently
+	in := fmt.Sprintf(`{"rate_limits":{"seven_day":{"used_percentage":52,"resets_at":%d}}}`, now.Add(48*time.Hour).Unix())
+	if _, err := RecordStatusline([]byte(in), now.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	l = LatestReading(now)
+	if l.SevenDay.Utilization != 52 || l.FiveHour.Utilization != 10 || l.Source != SourceStatusline {
+		t.Fatalf("merged: week %+v five %+v", l.SevenDay, l.FiveHour)
+	}
+	if NeedsAPI(now) {
+		t.Error("status line just delivered: no API needed")
+	}
+	if NeedsAPI(now.Add(StatuslineQuiet+time.Minute)) != true {
+		t.Error("status line quiet for a while: use the API again")
+	}
+}
+
+func TestExtrapolateFromLocalUsage(t *testing.T) {
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	reset := now.Add(3 * 24 * time.Hour) // week started 4 days ago
+	read := now.Add(-2 * time.Hour)
+	e := func(at time.Time, cost float64) Entry { return Entry{Time: at, Cost: cost, Tokens: Tokens{Out: 1}} }
+	entries := []Entry{
+		e(now.Add(-4*24*time.Hour+time.Hour), 40), // in the window before the reading
+		e(now.Add(-3*time.Hour), 60),              // $100 before the reading → 50% means 0.5%/$
+		e(now.Add(-time.Hour), 20),                // $20 since → +10 points
+	}
+	l := &Limits{Fetched: read, SevenDay: &LimitWindow{Utilization: 50, ResetsAt: reset, AsOf: read}}
+	got := Extrapolate(l, entries, now)
+	if !got.SevenDay.Approx || got.SevenDay.Utilization < 59.9 || got.SevenDay.Utilization > 60.1 {
+		t.Fatalf("extrapolated = %+v", got.SevenDay)
+	}
+	if l.SevenDay.Utilization != 50 || l.SevenDay.Approx {
+		t.Error("the stored reading must not be modified")
+	}
+	// fresh reading: shown as is
+	l.SevenDay.AsOf = now.Add(-time.Minute)
+	if got := Extrapolate(l, entries, now); got.SevenDay.Approx {
+		t.Error("a 1-minute-old reading shouldn't be marked approximate")
 	}
 }
