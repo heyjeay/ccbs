@@ -45,6 +45,21 @@ type statuslineCache struct {
 	Version  string       `json:"version,omitempty"`
 	FiveHour *LimitWindow `json:"five_hour,omitempty"`
 	SevenDay *LimitWindow `json:"seven_day,omitempty"`
+	// LastCall is the last time Claude Code ran `ccbs statusline` at all,
+	// with or without limits; --doctor uses it to tell "not being called"
+	// apart from "called, but no limits in the input".
+	LastCall time.Time `json:"last_call"`
+}
+
+// StatuslineState says what the status line route has seen so far.
+type StatuslineState struct {
+	LastCall, LastLimits time.Time
+	Version              string
+}
+
+func GetStatuslineState() StatuslineState {
+	c := loadStatuslineCache()
+	return StatuslineState{LastCall: c.LastCall, LastLimits: c.Received, Version: c.Version}
 }
 
 func statuslineCachePath() string {
@@ -87,10 +102,13 @@ func RecordStatusline(input []byte, now time.Time) (*Limits, error) {
 			c.SevenDay, got = w, true
 		}
 	}
-	if !got {
-		return nil, nil
+	c.LastCall = now
+	if in.Version != "" {
+		c.Version = in.Version
 	}
-	c.Received, c.Version = now, in.Version
+	if got {
+		c.Received = now
+	}
 	p := statuslineCachePath()
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return nil, err
@@ -103,6 +121,9 @@ func RecordStatusline(input []byte, now time.Time) (*Limits, error) {
 	if err := os.Rename(tmp, p); err != nil {
 		os.Remove(tmp)
 		return nil, err
+	}
+	if !got {
+		return nil, nil
 	}
 	return c.limits(), nil
 }

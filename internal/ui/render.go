@@ -348,7 +348,7 @@ func (f *frame) drawFiveStats(c *Canvas, r Rect, boxed bool) {
 			c.Text(x+7, y, "✓ safe until reset", Style{FG: th.Ok()}, 0)
 		}
 	})
-	if boxed && f.LiveErr != "" && f.Live == nil && !f.Demo {
+	if boxed && f.LiveErr != "" && f.Live == nil && !f.Demo && !f.HookInstalled {
 		line(func(y int) { c.Text(x, y, Truncate("live: "+f.LiveErr, r.W-2), Style{FG: th.InactiveFG}, 0) })
 	}
 	if !boxed || y >= r.Y+r.H-1 {
@@ -476,7 +476,9 @@ func (f *frame) drawWeek(c *Canvas, r Rect) {
 	if y < bottom {
 		if w.Estimated {
 			msg, retry := "rolling 7 days", ""
-			if f.LiveErr != "" && !f.Demo {
+			if f.HookInstalled && !f.Demo && !f.Offline {
+				msg = "no live % yet: waiting for Claude Code's next reply"
+			} else if f.LiveErr != "" && !f.Demo {
 				msg = "no live %: " + f.LiveErr
 				if !f.HookInstalled {
 					msg = "no live %: run `ccbs setup`"

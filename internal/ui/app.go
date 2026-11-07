@@ -120,7 +120,10 @@ func Run(opt Options) error {
 		}
 		return false
 	}
-	if opt.Live && !fromStatusline() {
+	// With `ccbs setup` done, Claude Code is the source; the usage API is only
+	// for people who haven't set it up (it rate limits, so don't mix them).
+	useAPI := opt.Live && !opt.HookInstalled
+	if opt.Live && !fromStatusline() && useAPI {
 		st.Live = usage.CachedLimits() // last known numbers, shown instantly
 		fetch()
 	}
@@ -175,7 +178,7 @@ func Run(opt Options) error {
 				loading = true
 				load()
 			}
-			if !st.Demo && !fromStatusline() {
+			if !st.Demo && !fromStatusline() && useAPI {
 				fetch() // no-op until the next allowed time
 			}
 			draw()
@@ -246,7 +249,9 @@ func Run(opt Options) error {
 					load()
 				}
 				nextFetch = time.Time{} // re-check the shared cache now (its back-off still applies)
-				fetch()
+				if !fromStatusline() && useAPI {
+					fetch()
+				}
 			}
 			draw()
 		}

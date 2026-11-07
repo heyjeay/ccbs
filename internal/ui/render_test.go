@@ -72,15 +72,20 @@ func TestRenderStaleAndBackoffLabels(t *testing.T) {
 	if !strings.Contains(out, "live · 20m old") || !strings.Contains(out, "61%") {
 		t.Errorf("stale live data should still show, labelled with its age")
 	}
-	st = &State{Now: now, LiveErr: "rate limited by Anthropic", LiveNext: now.Add(4 * time.Minute), HookInstalled: true}
+	// API fallback failing (no `ccbs setup`): point at the fix, show the retry
+	st = &State{Now: now, LiveErr: "rate limited by Anthropic", LiveNext: now.Add(4 * time.Minute)}
 	out = ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
-	if !strings.Contains(out, "no live %: rate limited") || !strings.Contains(out, "retry in 4m") {
-		t.Errorf("missing retry countdown")
+	if !strings.Contains(out, "no live %: run `ccbs setup`") || !strings.Contains(out, "retry in 4m") {
+		t.Errorf("missing setup hint or retry countdown")
 	}
-	// without the status line hook, point people at the fix instead
-	st.HookInstalled = false
-	out = ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
-	if !strings.Contains(out, "no live %: run `ccbs setup`") {
-		t.Errorf("missing setup hint")
+}
+
+func TestRenderWaitingForClaudeCode(t *testing.T) {
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	// set up, no numbers yet: never show the API's error, say what's happening
+	st := &State{Now: now, HookInstalled: true, LiveErr: "rate limited by Anthropic"}
+	out := ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
+	if !strings.Contains(out, "no live % yet: waiting for Claude Code") || strings.Contains(out, "rate limited") {
+		t.Errorf("waiting state wrong")
 	}
 }

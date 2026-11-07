@@ -253,10 +253,17 @@ func Diagnose(ctx context.Context, w io.Writer, hookInstalled bool, statusLineCm
 		ok("Claude Code's status line runs ccbs (%s)", statusLineCmd)
 		sc := loadStatuslineCache()
 		switch {
+		case sc.LastCall.IsZero():
+			bad("Claude Code hasn't run `ccbs statusline` yet")
+			info("open (or restart) Claude Code and send any message; its status line runs ccbs.")
+			info("if it still doesn't, check the status line under the prompt box for an error.")
 		case sc.Received.IsZero():
-			info("no limits received yet: they arrive with Claude Code's next reply")
-			info("(only Pro / Max / Ultra subscriptions get them)")
+			ok("Claude Code ran `ccbs statusline` %s ago (Claude Code %s)", fmtDuration(time.Since(sc.LastCall)), sc.Version)
+			bad("but it didn't include any rate limits")
+			info("Claude Code adds them only after the first reply in a session, and only for")
+			info("Pro / Max / Ultra subscriptions. Send a message, then run --doctor again.")
 		default:
+			ok("Claude Code ran `ccbs statusline` %s ago (Claude Code %s)", fmtDuration(time.Since(sc.LastCall)), sc.Version)
 			info("last limits from Claude Code: %s ago", fmtDuration(time.Since(sc.Received)))
 			if l := StatuslineLimits(time.Now()); l != nil {
 				if l.FiveHour != nil {
