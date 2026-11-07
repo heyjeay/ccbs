@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ccbs: Claude Code better status</title>
+  <meta name="description" content="A btop-style terminal dashboard for your Claude Code usage: 5-hour and weekly limits, reset countdowns, what you're working on, and where every token went.">
+  <meta property="og:title" content="ccbs: Claude Code better status">
+  <meta property="og:description" content="Your Claude Code limits, at a glance. A btop-style dashboard for your terminal.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="scan" aria-hidden="true"></div>
+
+  <header class="top">
+    <a href="./" class="brand"><span class="cursor-box">▌</span>ccbs</a>
+    <nav>
+      <a href="#features">features</a>
+      <a href="#themes">themes</a>
+      <a href="#usage">usage</a>
+      <a href="#privacy">privacy</a>
+      <a href="#install" class="cta">install</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+<pre class="logo" aria-label="ccbs">
+ ██████╗ ██████╗██████╗ ███████╗
+██╔════╝██╔════╝██╔══██╗██╔════╝
+██║     ██║     ██████╔╝███████╗
+██║     ██║     ██╔══██╗╚════██║
+╚██████╗╚██████╗██████╔╝███████║
+ ╚═════╝ ╚═════╝╚═════╝ ╚══════╝</pre>
+      <p class="tag">claude code <b>better status</b></p>
+      <h1>Your Claude Code limits, at a glance.</h1>
+      <p class="lede">
+        Never get blindsided by a usage limit again. Watch your 5-hour and weekly limits live,
+        get a heads-up before you run out, and see exactly where every token went.
+        All without leaving your terminal.
+      </p>
+
+      <fieldset class="box install" id="install" style="--c: var(--box1)">
+        <legend><span class="k">⁰</span>install</legend>
+        <div class="tabs" role="tablist" aria-label="Install method">
+          <button role="tab" data-os="unix" aria-selected="true">macOS / Linux</button>
+          <button role="tab" data-os="win" aria-selected="false">Windows</button>
+          <button role="tab" data-os="go" aria-selected="false">Go</button>
+        </div>
+        <div class="cmd">
+          <span class="sig" id="sig">$</span>
+          <code id="cmd">curl -fsSL https://heyjeay.github.io/ccbs/install.sh | sh</code>
+          <button class="copy" id="copy" aria-label="Copy install command">copy</button>
+        </div>
+        <p class="after" id="after">then run <code>ccbs setup</code> once, and <code>ccbs</code> &nbsp;·&nbsp; no sudo, checksum-verified</p>
+      </fieldset>
+      <p class="fine">Free &amp; open source. macOS, Linux and Windows. Reads the logs Claude Code already writes, so there's nothing to set up.</p>
+
+      <div class="preview-wrap">
+        <div class="glow" aria-hidden="true"></div>
+        <div class="window">
+          <div class="titlebar">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="wtitle">ccbs <span class="flag">--theme</span>
+              <select id="themeSel" aria-label="Theme"></select>
+            </span>
+            <span class="arrows">
+              <button id="prev" aria-label="Previous theme">‹</button><button id="next" aria-label="Next theme">›</button>
+            </span>
+          </div>
+          <div class="term" id="term" aria-label="ccbs dashboard preview showing the 5h window, weekly usage, active sessions and history"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="sec">
+      <h2><span class="dollar">$</span> ccbs --features</h2>
+      <p class="sub">Everything you want from <code>/usage</code>, and more. Live, in one glance, without leaving the terminal.</p>
+      <div class="grid">
+        <fieldset class="box" style="--c: var(--box1)">
+          <legend><span class="k">¹</span>5h window</legend>
+          <p>A braille graph of your token burn across the current five hours, with % used and a countdown to the reset.</p>
+          <p class="more"><b>pace</b> tells you whether you'll hit the limit before it resets, and roughly when.</p>
+        </fieldset>
+        <fieldset class="box" style="--c: var(--box2)">
+          <legend><span class="k">²</span>weekly</legend>
+          <p>Your weekly limit (and per-model ones like Sonnet), when it resets, and a bar for every day of the last week.</p>
+        </fieldset>
+        <fieldset class="box" style="--c: var(--box3)">
+          <legend><span class="k">³</span>now</legend>
+          <p>Every session that's running: project, branch, model, your latest prompt, and the last thing Claude did, like <code>Bash go test ./...</code></p>
+        </fieldset>
+        <fieldset class="box" style="--c: var(--box4)">
+          <legend><span class="k">⁴</span>history</legend>
+          <p>A process-list of every session you've had, with how long it ran and the tokens and cost it took. Sort it, scroll it, open one up.</p>
+        </fieldset>
+        <fieldset class="box" style="--c: var(--hi)">
+          <legend><span class="k">⁵</span>themes</legend>
+          <p>All 42 btop themes built in. Press <kbd>t</kbd> to flip through them, and ccbs remembers your pick.</p>
+        </fieldset>
+        <fieldset class="box" style="--c: var(--misc)">
+          <legend><span class="k">⁶</span>fits anywhere</legend>
+          <p>A full grid on a wide screen; stacked panels on a phone over SSH or a narrow tmux split. One small binary, no runtime.</p>
+        </fieldset>
+      </div>
+    </section>
+
+    <!-- Themes -->
+    <section id="themes" class="sec">
+      <h2><span class="dollar">$</span> ccbs --list-themes</h2>
+      <p class="sub">42 themes built in. Press <kbd>t</kbd> in ccbs to flip through them, or pick one below to try it on this page.</p>
+      <details class="theme-list">
+        <summary><span class="when-closed">[+] show all themes</span><span class="when-open">[−] hide themes</span></summary>
+        <div class="themes" id="themeGrid"></div>
+      </details>
+    </section>
+
+    <!-- Usage -->
+    <section id="usage" class="sec">
+      <h2><span class="dollar">$</span> ccbs --help</h2>
+      <div class="cols">
+        <fieldset class="box" style="--c: var(--box2)">
+          <legend>flags</legend>
+<dl class="kv">
+            <dt>ccbs</dt><dd>live dashboard</dd>
+            <dt>ccbs --demo</dt><dd>explore with sample data</dd>
+            <dt>ccbs --theme nord</dt><dd>pick a theme, or a .theme file</dd>
+            <dt>ccbs --list-themes</dt><dd>show every theme</dd>
+            <dt>ccbs --offline</dt><dd>don't contact Anthropic; estimate limits locally</dd>
+            <dt>ccbs --snapshot</dt><dd>print one frame and exit</dd>
+          </dl>
+        </fieldset>
+        <fieldset class="box" style="--c: var(--box3)">
+          <legend>keys</legend>
+<dl class="kv keys">
+            <dt><kbd>↑</kbd> <kbd>↓</kbd> <kbd>j</kbd> <kbd>k</kbd></dt><dd>select a session</dd>
+            <dt><kbd>s</kbd> <kbd>tab</kbd></dt><dd>sort: recent · tokens · cost · time</dd>
+            <dt><kbd>t</kbd> <kbd>T</kbd></dt><dd>next / previous theme</dd>
+            <dt><kbd>+</kbd> <kbd>-</kbd></dt><dd>refresh faster / slower</dd>
+            <dt><kbd>r</kbd></dt><dd>refresh now</dd>
+            <dt><kbd>q</kbd></dt><dd>quit</dd>
+          </dl>
+        </fieldset>
+      </div>
+    </section>
+
+    <!-- Privacy -->
+    <section id="privacy" class="sec narrow">
+      <fieldset class="box" style="--c: var(--misc)">
+        <legend>where the numbers come from</legend>
+        <div class="prose">
+          <p><b>Your sessions</b> come from the logs Claude Code already keeps on your computer, in <code>~/.claude/projects</code>.
+            ccbs only reads them, and they never leave your machine.</p>
+          <p><b>Your 5-hour and weekly %</b> come from Claude Code itself. Run <code>ccbs setup</code> once and Claude Code passes them
+            to ccbs through its status line on every reply. ccbs makes no requests for them, so there are no rate limits and no logins involved.
+            If you already use a status line, it keeps showing; <code>ccbs setup --remove</code> undoes it.</p>
+          <p>Without setup, ccbs asks Anthropic directly (the same place <code>/usage</code> looks), signed in with your Claude Code login,
+            which it only ever sends to <code>api.anthropic.com</code>. <code>ccbs --offline</code> never contacts anyone.</p>
+          <p><b>Cost</b> is what those tokens would cost at standard API prices, a way to see how heavy a session was.
+            It isn't what your subscription charges you.</p>
+          <p>No accounts, no analytics, no servers of our own. This website doesn't track you either.</p>
+        </div>
+      </fieldset>
+    </section>
+
+    <!-- Open source -->
+    <section id="contribute" class="sec narrow">
+      <fieldset class="box" style="--c: var(--box4)">
+        <legend>open source</legend>
+        <div class="prose">
+          <p>ccbs is written in Go and licensed GPL-3.0. Ideas, bug reports and pull requests are all welcome.</p>
+          <p class="links">
+            <a class="btn" href="https://github.com/heyjeay/ccbs" id="ghLink">[ github ]</a>
+            <a class="btn" href="https://github.com/heyjeay/ccbs/issues" id="issuesLink">[ report a bug ]</a>
+            <a class="btn" href="https://github.com/heyjeay/ccbs/releases" id="relLink">[ releases ]</a>
+          </p>
+          <p class="credit">The look, and all 42 themes, come from <a href="https://github.com/aristocratos/btop">btop</a> by aristocratos and its theme authors (Apache-2.0).</p>
+        </div>
+      </fieldset>
+    </section>
+  </main>
+
+  <footer>
+    <p><span class="d">$</span> exit <span class="ok">0</span></p>
+    <p class="made">made with <svg class="heart" viewBox="0 0 13 12" role="img" aria-label="love" shape-rendering="crispEdges"><rect class="o" x="2" y="0" width="3" height="1"/><rect class="o" x="8" y="0" width="3" height="1"/><rect class="o" x="1" y="1" width="1" height="1"/><rect class="r" x="2" y="1" width="3" height="1"/><rect class="o" x="5" y="1" width="1" height="1"/><rect class="o" x="7" y="1" width="1" height="1"/><rect class="r" x="8" y="1" width="2" height="1"/><rect class="s" x="10" y="1" width="1" height="1"/><rect class="o" x="11" y="1" width="1" height="1"/><rect class="o" x="0" y="2" width="1" height="1"/><rect class="r" x="1" y="2" width="1" height="1"/><rect class="h" x="2" y="2" width="2" height="1"/><rect class="r" x="4" y="2" width="2" height="1"/><rect class="o" x="6" y="2" width="1" height="1"/><rect class="r" x="7" y="2" width="4" height="1"/><rect class="s" x="11" y="2" width="1" height="1"/><rect class="o" x="12" y="2" width="1" height="1"/><rect class="o" x="0" y="3" width="1" height="1"/><rect class="r" x="1" y="3" width="1" height="1"/><rect class="h" x="2" y="3" width="1" height="1"/><rect class="r" x="3" y="3" width="8" height="1"/><rect class="s" x="11" y="3" width="1" height="1"/><rect class="o" x="12" y="3" width="1" height="1"/><rect class="o" x="0" y="4" width="1" height="1"/><rect class="r" x="1" y="4" width="10" height="1"/><rect class="s" x="11" y="4" width="1" height="1"/><rect class="o" x="12" y="4" width="1" height="1"/><rect class="o" x="0" y="5" width="1" height="1"/><rect class="r" x="1" y="5" width="1" height="1"/><rect class="h" x="2" y="5" width="1" height="1"/><rect class="r" x="3" y="5" width="8" height="1"/><rect class="s" x="11" y="5" width="1" height="1"/><rect class="o" x="12" y="5" width="1" height="1"/><rect class="o" x="1" y="6" width="1" height="1"/><rect class="r" x="2" y="6" width="8" height="1"/><rect class="s" x="10" y="6" width="1" height="1"/><rect class="o" x="11" y="6" width="1" height="1"/><rect class="o" x="2" y="7" width="1" height="1"/><rect class="r" x="3" y="7" width="6" height="1"/><rect class="s" x="9" y="7" width="1" height="1"/><rect class="o" x="10" y="7" width="1" height="1"/><rect class="o" x="3" y="8" width="1" height="1"/><rect class="r" x="4" y="8" width="4" height="1"/><rect class="s" x="8" y="8" width="1" height="1"/><rect class="o" x="9" y="8" width="1" height="1"/><rect class="o" x="4" y="9" width="1" height="1"/><rect class="r" x="5" y="9" width="2" height="1"/><rect class="s" x="7" y="9" width="1" height="1"/><rect class="o" x="8" y="9" width="1" height="1"/><rect class="o" x="5" y="10" width="1" height="1"/><rect class="s" x="6" y="10" width="1" height="1"/><rect class="o" x="7" y="10" width="1" height="1"/><rect class="o" x="6" y="11" width="1" height="1"/></svg> by Jeay &nbsp;·&nbsp; <a href="https://discord.gg/T5bF56tvyj" target="_blank" rel="noopener">join the Discord</a> for more</p>
+    <p class="fine">ccbs is a community project and isn't affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
