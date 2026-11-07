@@ -26,23 +26,24 @@ func (s SortMode) String() string {
 
 // State is everything a frame needs.
 type State struct {
-	Now       time.Time
-	Snap      usage.Snapshot
-	Live      *usage.Limits
-	LiveErr   string
-	Demo      bool
-	Sel       int
-	Sort      SortMode
-	Frame     int
-	Interval  time.Duration
-	ActiveFor time.Duration // a session counts as "now" if touched within this
-	Toast     string        // brief message shown in the top border
-	ToastTill time.Time
-	Offline   bool      // --offline: live limits deliberately not fetched
-	LiveNext  time.Time // when live limits will next be fetched
-	Loading   bool      // first read of the transcripts still running
-	LoadDone  int64     // bytes read so far
-	LoadTotal int64
+	Now           time.Time
+	Snap          usage.Snapshot
+	Live          *usage.Limits
+	LiveErr       string
+	Demo          bool
+	Sel           int
+	Sort          SortMode
+	Frame         int
+	Interval      time.Duration
+	ActiveFor     time.Duration // a session counts as "now" if touched within this
+	Toast         string        // brief message shown in the top border
+	ToastTill     time.Time
+	Offline       bool      // --offline: live limits deliberately not fetched
+	LiveNext      time.Time // when live limits will next be fetched
+	HookInstalled bool      // Claude Code's status line runs ccbs
+	Loading       bool      // first read of the transcripts still running
+	LoadDone      int64     // bytes read so far
+	LoadTotal     int64
 }
 
 // derived per-frame data
@@ -154,7 +155,7 @@ func (f *frame) sourceTag() []Tag {
 	case f.Demo:
 		return []Tag{{Text: "● ", FG: th.Temp.At(1)}, {Text: "demo"}}
 	case f.Live != nil:
-		if age := f.Now.Sub(f.Live.Fetched); age > 2*usage.PollEvery {
+		if age := f.Now.Sub(f.Live.Fetched); f.Live.Source != usage.SourceStatusline && age > 2*usage.PollEvery {
 			// last good numbers, kept while Anthropic can't be asked
 			return []Tag{{Text: "● ", FG: th.Warn()}, {Text: "live · " + fmtDur(age) + " old"}}
 		}
@@ -477,6 +478,9 @@ func (f *frame) drawWeek(c *Canvas, r Rect) {
 			msg, retry := "rolling 7 days", ""
 			if f.LiveErr != "" && !f.Demo {
 				msg = "no live %: " + f.LiveErr
+				if !f.HookInstalled {
+					msg = "no live %: run `ccbs setup`"
+				}
 				if wait := f.LiveNext.Sub(f.Now); wait > 0 {
 					retry = "retry in " + fmtDur(wait)
 					c.TextRight(right, y, retry, Style{FG: th.MainFG})

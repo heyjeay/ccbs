@@ -59,7 +59,7 @@ install -m 0755 "$tmp/ccbs" "$DIR/ccbs" 2>/dev/null || { cp "$tmp/ccbs" "$DIR/cc
 say "installed $("$DIR/ccbs" --version) → $DIR/ccbs"
 
 case ":$PATH:" in
-  *":$DIR:"*) say "run: ccbs" ;;
+  *":$DIR:"*) say "first time? run: ccbs setup   (live 5h/weekly limits from Claude Code)"; say "then run: ccbs" ;;
   *) say "add $DIR to your PATH, e.g.:"
      printf '    echo '\''export PATH="%s:$PATH"'\'' >> ~/.%src && exec $SHELL\n' "$DIR" "$(basename "${SHELL:-sh}")" ;;
 esac

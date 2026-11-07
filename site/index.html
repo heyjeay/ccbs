@@ -58,7 +58,7 @@
           <code id="cmd">curl -fsSL https://heyjeay.github.io/ccbs/install.sh | sh</code>
           <button class="copy" id="copy" aria-label="Copy install command">copy</button>
         </div>
-        <p class="after" id="after">then run <code>ccbs</code> &nbsp;·&nbsp; installs to <code>~/.local/bin</code>, no sudo, checksum-verified</p>
+        <p class="after" id="after">then run <code>ccbs setup</code> once, and <code>ccbs</code> &nbsp;·&nbsp; no sudo, checksum-verified</p>
       </fieldset>
       <p class="fine">Free &amp; open source. macOS, Linux and Windows. Reads the logs Claude Code already writes, so there's nothing to set up.</p>
 
@@ -158,9 +158,11 @@
         <div class="prose">
           <p><b>Your sessions</b> come from the logs Claude Code already keeps on your computer, in <code>~/.claude/projects</code>.
             ccbs only reads them, and they never leave your machine.</p>
-          <p><b>Your 5-hour and weekly %</b> come from Anthropic, the same place Claude Code's own <code>/usage</code> screen gets them.
-            ccbs signs in with the Claude Code login you already have and sends it only to <code>api.anthropic.com</code>.
-            Run <code>ccbs --offline</code> and it won't contact anyone; the limits are then estimated from your history.</p>
+          <p><b>Your 5-hour and weekly %</b> come from Claude Code itself. Run <code>ccbs setup</code> once and Claude Code passes them
+            to ccbs through its status line on every reply. ccbs makes no requests for them, so there are no rate limits and no logins involved.
+            If you already use a status line, it keeps showing; <code>ccbs setup --remove</code> undoes it.</p>
+          <p>Without setup, ccbs asks Anthropic directly (the same place <code>/usage</code> looks), signed in with your Claude Code login,
+            which it only ever sends to <code>api.anthropic.com</code>. <code>ccbs --offline</code> never contacts anyone.</p>
           <p><b>Cost</b> is what those tokens would cost at standard API prices, a way to see how heavy a session was.
             It isn't what your subscription charges you.</p>
           <p>No accounts, no analytics, no servers of our own. This website doesn't track you either.</p>

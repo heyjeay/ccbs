@@ -66,7 +66,8 @@ try {
     if ($wasRunning) {
         Say "ccbs was open: quit it (q) and start it again to use the new version"
     } else {
-        Say "run: ccbs"
+        Say "first time? run: ccbs setup   (live 5h/weekly limits from Claude Code)"
+        Say "then run: ccbs"
     }
 } finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue

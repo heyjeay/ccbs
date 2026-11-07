@@ -30,7 +30,11 @@ type Limits struct {
 	SevenDayOpus   *LimitWindow `json:"seven_day_opus,omitempty"`
 	SevenDaySonnet *LimitWindow `json:"seven_day_sonnet,omitempty"`
 	Fetched        time.Time    `json:"fetched"`
+	Source         string       `json:"source,omitempty"` // SourceStatusline or "" (the usage API)
 }
+
+// SourceStatusline marks limits that came from Claude Code's status line.
+const SourceStatusline = "statusline"
 
 var usageURL = "https://api.anthropic.com/api/oauth/usage"
 
@@ -146,8 +150,10 @@ func callUsage(ctx context.Context, token string) (rawResponse, error) {
 
 func statusError(status int, retryAfter time.Duration) *LimitError {
 	switch {
-	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+	case status == http.StatusUnauthorized:
 		return &LimitError{Msg: "login expired, open Claude Code", Retry: 2 * time.Minute}
+	case status == http.StatusForbidden:
+		return &LimitError{Msg: "Anthropic refused this login (403)", Retry: 10 * time.Minute}
 	case status == http.StatusTooManyRequests:
 		return &LimitError{Msg: "rate limited by Anthropic", Retry: max(retryAfter, 5*time.Minute), RateLimited: true}
 	case status >= 500:
@@ -218,7 +224,7 @@ func FetchLimits(ctx context.Context) (*Limits, error) {
 
 // Diagnose explains, step by step, whether live limits work on this machine.
 // It is what `ccbs --doctor` prints. It never prints the token.
-func Diagnose(ctx context.Context, w io.Writer) {
+func Diagnose(ctx context.Context, w io.Writer, hookInstalled bool, statusLineCmd string) {
 	ok := func(f string, a ...any) { fmt.Fprintf(w, "  \x1b[32m✓\x1b[0m "+f+"\n", a...) }
 	bad := func(f string, a ...any) { fmt.Fprintf(w, "  \x1b[31m✗\x1b[0m "+f+"\n", a...) }
 	info := func(f string, a ...any) { fmt.Fprintf(w, "      "+f+"\n", a...) }
@@ -240,6 +246,43 @@ func Diagnose(ctx context.Context, w io.Writer) {
 			return nil
 		})
 		ok("transcripts: %s (%d files, %.1f MB)", d, files, float64(size)/(1<<20))
+	}
+
+	// 1. the status line route (preferred: no requests, no rate limits)
+	if hookInstalled {
+		ok("Claude Code's status line runs ccbs (%s)", statusLineCmd)
+		sc := loadStatuslineCache()
+		switch {
+		case sc.Received.IsZero():
+			info("no limits received yet: they arrive with Claude Code's next reply")
+			info("(only Pro / Max / Ultra subscriptions get them)")
+		default:
+			info("last limits from Claude Code: %s ago", fmtDuration(time.Since(sc.Received)))
+			if l := StatuslineLimits(time.Now()); l != nil {
+				if l.FiveHour != nil {
+					info("five_hour  %5.1f%%   resets %s", l.FiveHour.Utilization, l.FiveHour.ResetsAt.Local().Format("Mon 15:04"))
+				}
+				if l.SevenDay != nil {
+					info("seven_day  %5.1f%%   resets %s", l.SevenDay.Utilization, l.SevenDay.ResetsAt.Local().Format("Mon 15:04"))
+				}
+				ok("live limits come from Claude Code; the API check below is only a fallback")
+			} else {
+				info("those windows have reset since; new numbers come with the next reply")
+			}
+		}
+	} else {
+		bad("Claude Code's status line doesn't run ccbs")
+		if statusLineCmd != "" {
+			info("current status line: %s (ccbs setup keeps showing it)", statusLineCmd)
+		}
+		info("run `ccbs setup` so Claude Code hands ccbs your limits directly:")
+		info("no requests to Anthropic, no rate limits, no login problems.")
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "fallback: Anthropic usage API")
+	if hookInstalled && StatuslineLimits(time.Now()) != nil {
+		info("skipped: not needed while the status line is delivering limits")
+		return
 	}
 
 	c, err := readCredentials()

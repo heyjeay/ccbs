@@ -72,9 +72,15 @@ func TestRenderStaleAndBackoffLabels(t *testing.T) {
 	if !strings.Contains(out, "live · 20m old") || !strings.Contains(out, "61%") {
 		t.Errorf("stale live data should still show, labelled with its age")
 	}
-	st = &State{Now: now, LiveErr: "rate limited by Anthropic", LiveNext: now.Add(4 * time.Minute)}
+	st = &State{Now: now, LiveErr: "rate limited by Anthropic", LiveNext: now.Add(4 * time.Minute), HookInstalled: true}
 	out = ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
 	if !strings.Contains(out, "no live %: rate limited") || !strings.Contains(out, "retry in 4m") {
 		t.Errorf("missing retry countdown")
+	}
+	// without the status line hook, point people at the fix instead
+	st.HookInstalled = false
+	out = ansi.ReplaceAllString(Render(st, 120, 40, BtopDefault), "")
+	if !strings.Contains(out, "no live %: run `ccbs setup`") {
+		t.Errorf("missing setup hint")
 	}
 }

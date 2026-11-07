@@ -12,11 +12,11 @@
   const here = new URL('.', location.href).href;
   const CMDS = {
     unix: { sig: '$', cmd: `curl -fsSL ${here}install.sh | sh`,
-      after: 'then run <code>ccbs</code> &nbsp;·&nbsp; installs to <code>~/.local/bin</code>, no sudo, checksum-verified' },
+      after: 'then run <code>ccbs setup</code> once, and <code>ccbs</code> &nbsp;·&nbsp; no sudo, checksum-verified' },
     win: { sig: 'PS>', cmd: `irm ${here}install.ps1 | iex`,
-      after: 'then open a new terminal and run <code>ccbs</code> &nbsp;·&nbsp; no admin needed, checksum-verified' },
+      after: 'then, in a new terminal, run <code>ccbs setup</code> once, and <code>ccbs</code> &nbsp;·&nbsp; no admin needed' },
     go: { sig: '$', cmd: 'go install github.com/heyjeay/ccbs@latest',
-      after: 'needs Go 1.24+ &nbsp;·&nbsp; then run <code>ccbs</code>' },
+      after: 'needs Go 1.24+ &nbsp;·&nbsp; then run <code>ccbs setup</code> once, and <code>ccbs</code>' },
   };
   const tabs = document.querySelectorAll('.tabs button');
   function pickOS(os) {

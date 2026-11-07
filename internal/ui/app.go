@@ -44,6 +44,8 @@ type Options struct {
 	Theme    Theme
 	// OnTheme is called after the user switches theme (to persist it).
 	OnTheme func(Theme)
+	// HookInstalled: Claude Code's status line runs ccbs (see `ccbs setup`).
+	HookInstalled bool
 }
 
 type liveResult struct {
@@ -74,7 +76,7 @@ func Run(opt Options) error {
 		term.Restore(in, old)
 	}()
 
-	st := &State{Interval: opt.Interval, Now: time.Now(), Offline: !opt.Live && opt.Demo == nil}
+	st := &State{Interval: opt.Interval, Now: time.Now(), Offline: !opt.Live && opt.Demo == nil, HookInstalled: opt.HookInstalled}
 	if opt.Demo != nil {
 		st.Demo, st.Live = true, opt.Demo
 	}
@@ -106,10 +108,22 @@ func Run(opt Options) error {
 	// Draw straight away and read history in the background: a big
 	// ~/.claude/projects can take a moment, and a blank screen looks hung.
 	st.Loading = true
-	if opt.Live {
-		st.Live = usage.CachedLimits() // last known numbers, shown instantly
+	// Best source: what Claude Code itself reported through its status line
+	// (`ccbs setup`). Otherwise fall back to asking Anthropic's usage API.
+	fromStatusline := func() bool {
+		if !opt.Live {
+			return false
+		}
+		if l := usage.StatuslineLimits(time.Now()); l != nil {
+			st.Live, st.LiveErr = l, ""
+			return true
+		}
+		return false
 	}
-	fetch()
+	if opt.Live && !fromStatusline() {
+		st.Live = usage.CachedLimits() // last known numbers, shown instantly
+		fetch()
+	}
 
 	w, h, _ := term.GetSize(int(out.Fd()))
 	draw := func() {
@@ -161,7 +175,7 @@ func Run(opt Options) error {
 				loading = true
 				load()
 			}
-			if !st.Demo {
+			if !st.Demo && !fromStatusline() {
 				fetch() // no-op until the next allowed time
 			}
 			draw()
@@ -172,6 +186,9 @@ func Run(opt Options) error {
 		case r := <-live:
 			fetching = false
 			nextFetch, st.LiveNext = r.next, r.next
+			if st.Live != nil && st.Live.Source == usage.SourceStatusline {
+				break // status line data arrived meanwhile; it wins
+			}
 			if r.l != nil {
 				st.Live = r.l // may be the last good result while backing off
 			}

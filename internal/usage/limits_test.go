@@ -100,7 +100,7 @@ func TestExpiredLookingTokenIsStillTried(t *testing.T) {
 func TestDiagnoseNeverPrintsToken(t *testing.T) {
 	fakeUsage(t, 200, `{"five_hour":{"utilization":5,"resets_at":"2030-01-01T00:00:00Z"},"seven_day":{"utilization":9,"resets_at":null}}`)
 	var buf bytes.Buffer
-	Diagnose(context.Background(), &buf)
+	Diagnose(context.Background(), &buf, false, "")
 	out := buf.String()
 	if strings.Contains(out, "test-token") {
 		t.Fatal("doctor output leaked the token")
@@ -112,8 +112,8 @@ func TestDiagnoseNeverPrintsToken(t *testing.T) {
 	}
 	fakeUsage(t, 401, `{"error":"invalid token"}`)
 	buf.Reset()
-	Diagnose(context.Background(), &buf)
-	if !strings.Contains(buf.String(), "401") || !strings.Contains(buf.String(), "login expired") {
+	Diagnose(context.Background(), &buf, false, "")
+	if !strings.Contains(buf.String(), "401") || !strings.Contains(buf.String(), "login expired") || !strings.Contains(buf.String(), "ccbs setup") {
 		t.Errorf("401 not explained:\n%s", buf.String())
 	}
 }
@@ -169,5 +169,37 @@ func TestPollLimitsSharesCacheAndBacksOff(t *testing.T) {
 	}
 	if got := CachedLimits(); got == nil || got.SevenDay.Utilization != 9 {
 		t.Fatal("restart should see the cached limits")
+	}
+}
+
+func TestRecordStatusline(t *testing.T) {
+	t.Setenv("CCBS_CACHE_DIR", t.TempDir())
+	now := time.Unix(1_800_000_000, 0)
+	in := `{"version":"2.1.300","model":{"display_name":"Opus"},
+	  "rate_limits":{"five_hour":{"used_percentage":23.5,"resets_at":1800003600},
+	                 "seven_day":{"used_percentage":41.2,"resets_at":1800300000}}}`
+	l, err := RecordStatusline([]byte(in), now)
+	if err != nil || l == nil || l.SevenDay.Utilization != 41.2 || l.FiveHour.ResetsAt.Unix() != 1800003600 {
+		t.Fatalf("record: %+v %v", l, err)
+	}
+	// a later update without rate_limits (new session, before its first reply)
+	// keeps what we had
+	if l, _ := RecordStatusline([]byte(`{"model":{"display_name":"Opus"}}`), now.Add(time.Minute)); l != nil {
+		t.Error("an update without limits shouldn't produce limits")
+	}
+	got := StatuslineLimits(now.Add(2 * time.Minute))
+	if got == nil || got.Source != SourceStatusline || got.SevenDay.Utilization != 41.2 {
+		t.Fatalf("cached = %+v", got)
+	}
+	// once the 5h window resets it's dropped, the weekly one stays
+	got = StatuslineLimits(now.Add(2 * time.Hour))
+	if got == nil || got.FiveHour != nil || got.SevenDay == nil {
+		t.Fatalf("after 5h reset = %+v", got)
+	}
+	if s := StatuslineSummary(got, "Opus", now); !strings.Contains(s, "week 41%") {
+		t.Errorf("summary = %q", s)
+	}
+	if _, err := RecordStatusline([]byte(`not json`), now); err == nil {
+		t.Error("bad input should error (and the caller still prints a line)")
 	}
 }

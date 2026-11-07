@@ -6,10 +6,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/heyjeay/ccbs/internal/hook"
 	"github.com/heyjeay/ccbs/internal/ui"
 	"github.com/heyjeay/ccbs/internal/usage"
 )
@@ -21,6 +23,17 @@ type demoSource struct{ snap usage.Snapshot }
 func (d demoSource) Refresh() usage.Snapshot { return d.snap }
 
 func main() {
+	// subcommands: `ccbs statusline` (run by Claude Code) and `ccbs setup`
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "statusline":
+			runStatusline()
+			return
+		case "setup":
+			runSetup(len(os.Args) > 2 && (os.Args[2] == "--remove" || os.Args[2] == "remove"))
+			return
+		}
+	}
 	var (
 		demo       = flag.Bool("demo", false, "show generated sample data instead of your own")
 		offline    = flag.Bool("offline", false, "don't query Anthropic for live 5h/weekly limits; estimate locally")
@@ -38,6 +51,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "ccbs %s — Claude Code better status\n\nusage: ccbs [flags]\n\n", version)
 		flag.PrintDefaults()
+		fmt.Fprint(os.Stderr, "\ncommands:\n  ccbs setup            show live 5h/weekly limits via Claude Code's status line (recommended)\n  ccbs setup --remove   undo that\n")
 		fmt.Fprint(os.Stderr, "\nkeys: ↑/↓ j/k select · s sort · t/T theme · +/- interval · r refresh · q quit\n")
 	}
 	flag.Parse()
@@ -46,7 +60,8 @@ func main() {
 		return
 	}
 	if *doctor {
-		usage.Diagnose(context.Background(), os.Stdout)
+		installed, cmd := hook.Status()
+		usage.Diagnose(context.Background(), os.Stdout, installed, cmd)
 		return
 	}
 	if *listThemes {
@@ -103,22 +118,27 @@ func main() {
 	if *snapshot {
 		st := &ui.State{Now: now, Snap: src.Refresh(), Interval: *interval, Demo: *demo, Live: demoLimits, Offline: *offline}
 		if !*demo && !*offline {
-			l, next, err := usage.PollLimits(context.Background())
-			if err != nil {
-				st.LiveErr = err.Error()
+			if l := usage.StatuslineLimits(time.Now()); l != nil {
+				st.Live = l
+			} else {
+				l, next, err := usage.PollLimits(context.Background())
+				if err != nil {
+					st.LiveErr = err.Error()
+				}
+				st.Live, st.LiveNext = l, next
 			}
-			st.Live, st.LiveNext = l, next
 		}
 		fmt.Println(ui.Render(st, *width, *height, theme))
 		return
 	}
 
 	err := ui.Run(ui.Options{
-		Source:   src,
-		Live:     !*demo && !*offline,
-		Demo:     demoLimits,
-		Interval: *interval,
-		Theme:    theme,
+		Source:        src,
+		Live:          !*demo && !*offline,
+		Demo:          demoLimits,
+		Interval:      *interval,
+		Theme:         theme,
+		HookInstalled: func() bool { ok, _ := hook.Status(); return ok }(),
 		OnTheme: func(t ui.Theme) {
 			cfg["theme"] = t.Name
 			_ = cfg.Save()
@@ -127,6 +147,45 @@ func main() {
 	if err != nil {
 		fatal(fmt.Errorf("needs an interactive terminal (try --snapshot): %w", err))
 	}
+}
+
+// runStatusline is what Claude Code runs as its status line. It records the
+// live limits Claude Code passes in, then prints a status line: the user's
+// own one if they had one, otherwise a short summary. It must always exit 0
+// quickly, or Claude Code shows a blank line.
+func runStatusline() {
+	input, _ := io.ReadAll(io.LimitReader(os.Stdin, 4<<20))
+	l, _ := usage.RecordStatusline(input, time.Now())
+	if out, ok := hook.Chained(input); ok {
+		fmt.Println(out)
+		return
+	}
+	if l == nil {
+		l = usage.StatuslineLimits(time.Now())
+	}
+	fmt.Println(usage.StatuslineSummary(l, usage.ModelName(input), time.Now()))
+}
+
+func runSetup(remove bool) {
+	if remove {
+		msg, err := hook.Remove()
+		if err != nil {
+			fatal(err)
+		}
+		fmt.Println("ccbs:", msg)
+		return
+	}
+	msg, err := hook.Install()
+	if err != nil {
+		fatal(err)
+	}
+	fmt.Println("ccbs: Claude Code's status line now runs ccbs (" + hook.SettingsPath() + ")")
+	if msg != "" {
+		fmt.Println("ccbs:", msg)
+	}
+	fmt.Println("ccbs: your live 5h and weekly limits appear after Claude Code's next reply.")
+	fmt.Println("      Claude Code sends them to its status line itself: no extra requests, no rate limits.")
+	fmt.Println("      Undo any time with: ccbs setup --remove")
 }
 
 func fatal(err error) {

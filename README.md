@@ -58,10 +58,12 @@ ccbs also loads `.theme` files from `~/.config/ccbs/themes`, `~/.config/btop/the
 ## Usage
 
 ```sh
+ccbs setup        # once: get live 5h/weekly limits from Claude Code (recommended)
 ccbs              # live dashboard
 ccbs --demo       # explore with generated sample data
 ccbs --offline    # don't contact Anthropic; estimate limits locally
 ccbs --snapshot --width 120 --height 40   # print one frame and exit
+ccbs --doctor     # explain where the live limits come from, or why they don't
 ```
 
 | Key | Action |
@@ -77,7 +79,8 @@ ccbs --snapshot --width 120 --height 40   # print one frame and exit
 ## Where the numbers come from
 
 - **Tokens, sessions, prompts, and tools** are read from Claude Code's local transcripts (`~/.claude/projects/**/*.jsonl`, or `$CLAUDE_CONFIG_DIR`). Files are tailed incrementally, so a refresh only reads newly appended bytes. Streamed responses that Claude Code logs more than once are de-duplicated by message and request ID.
-- **5h and weekly utilization (%) and reset times** come from the same endpoint Claude Code's `/usage` screen uses (`api.anthropic.com/api/oauth/usage`). ccbs authenticates with your existing Claude Code login, read from `~/.claude/.credentials.json` or the macOS keychain. The token is only ever sent to `api.anthropic.com`. ccbs polls about once a minute and shows `● live` in the top-right corner.
+- **5h and weekly utilization (%) and reset times** come from Claude Code itself. Run `ccbs setup` once: it points Claude Code's [status line](https://code.claude.com/docs/en/statusline) at `ccbs statusline`, and Claude Code then hands ccbs your `rate_limits` on every reply (Pro, Max and Ultra plans). No requests, no rate limits, no login handling. If you already have a status line, ccbs keeps showing it, and `ccbs setup --remove` puts it back. `settings.json` is backed up first.
+- **Without `ccbs setup`**, ccbs falls back to the endpoint Claude Code's `/usage` screen uses (`api.anthropic.com/api/oauth/usage`), signed in with your existing Claude Code login. The token is only ever sent to `api.anthropic.com`. That endpoint rate limits eagerly, so ccbs asks at most every 3 minutes, shares one cached result between windows, and backs off on errors. `ccbs --doctor` explains what's working.
 - **Offline / estimated mode** (`--offline`, or when no login is found): the 5h window is reconstructed ccusage-style (it starts at the top of the hour of your first message), and % used is estimated against your most expensive previous window. The weekly box becomes a rolling 7-day view. The corner shows `● local est.`
 - **Cost** is the API-equivalent price at published per-token rates, including cache-write (5m / 1h) and cache-read pricing. It's a yardstick for how heavy a session was, not what your subscription bills you.
 
